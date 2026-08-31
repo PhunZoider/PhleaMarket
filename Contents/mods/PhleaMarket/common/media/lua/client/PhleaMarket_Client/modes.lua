@@ -347,26 +347,87 @@ Core.registerShopMode({
         return (Core.wallet:getBalance(ui.player, price.pool) or 0) >= (price.amount or 0)
     end,
 
-    onAction = function(ui)
-        if not ui.selectedId then
-            return
-        end
-        if not groupOf(ui) and not isSellerSearch(ui) then
-            -- Opened even when there is only one listing under it. That page is
-            -- then a confirmation: who is selling, what condition it is in and
-            -- what they want, before any money moves.
-            local fullType = tostring(ui.selectedId):match("^type:(.+)$")
-            if fullType then
-                openGroup(ui, fullType)
+    --- What the tile above is standing for.
+    ---
+    --- The price and stock lines are true and incomplete on a grouped tile: the
+    --- figure is the lowest anybody is asking and the count is spread across
+    --- several sellers. Saying so is the difference between a figure and a
+    --- misleading one, and it is what makes a type worth opening -- or not.
+    detailLines = function(ui, offer)
+        if groupOf(ui) or isSellerSearch(ui) then
+            -- A single listing. Who is selling it is the useful fact here, and
+            -- the price above is simply the price.
+            local row = Modes.rowFor(ui, offer)
+            if not row then
+                return nil
             end
-            return
+            return {{
+                text = getText("IGUI_PhleaMarket_SoldBy", row.sellerChar or row.seller or "?")
+            }}
         end
-        Client.send(C.buy, {
-            listingId = ui.selectedId,
-            qty = 1
-        })
+
+        local fullType = tostring(ui.selectedId or ""):match("^type:(.+)$")
+        if not fullType then
+            return nil
+        end
+        for _, row in ipairs((Client.data.browse and Client.data.browse.rows) or {}) do
+            if row.fullType == fullType then
+                -- One listing is worth saying outright. It is the case that
+                -- looks oddest after opening -- a page holding a single row --
+                -- and knowing beforehand turns that from a surprise into what
+                -- was expected.
+                if row.listings == 1 then
+                    return {{
+                        text = getText("IGUI_PhleaMarket_OneListing")
+                    }}
+                end
+                return {{
+                    text = getText("IGUI_PhleaMarket_FromPrice", Market.formatAmount("change", row.low))
+                }, {
+                    text = getText("IGUI_PhleaMarket_AcrossListings", tostring(row.listings))
+                }}
+            end
+        end
+        return nil
+    end,
+
+    --- Double-click opens a type, or buys a listing.
+    ---
+    --- The same thing the action button does, on the motion people already make
+    --- for it. Buying on a double-click is safe here in a way it would not be on
+    --- a shop machine, because a listing is opened before it can be bought: the
+    --- second click lands on a page the first one had to reach.
+    onActivate = function(ui, id, offer)
+        Market.modes.activate(ui)
+    end,
+
+    onAction = function(ui)
+        Market.modes.activate(ui)
     end
 })
+
+--- Open the selected type, or buy the selected listing.
+---
+--- Shared by the action button and the double-click so the two cannot drift.
+function Modes.activate(ui)
+    if not ui.selectedId then
+        return
+    end
+    if not groupOf(ui) and not isSellerSearch(ui) then
+        -- Opened even when there is only one listing under it. That page is
+        -- then a confirmation: who is selling, what condition it is in and what
+        -- they want, before any money moves.
+        local fullType = tostring(ui.selectedId):match("^type:(.+)$")
+        if fullType then
+            openGroup(ui, fullType)
+        end
+        return
+    end
+    Client.send(C.buy, {
+        listingId = ui.selectedId,
+        qty = 1
+    })
+end
 
 ---------------------------------------------------------------------------
 -- Sell

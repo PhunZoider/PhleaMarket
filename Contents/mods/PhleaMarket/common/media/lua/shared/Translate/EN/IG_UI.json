@@ -6,6 +6,10 @@
 
   "IGUI_PhleaMarket_BuyBack": "Buy back",
   "IGUI_PhleaMarket_View": "View",
+  "IGUI_PhleaMarket_FromPrice": "From %1 each",
+  "IGUI_PhleaMarket_AcrossListings": "Across %1 listings",
+  "IGUI_PhleaMarket_OneListing": "One listing",
+  "IGUI_PhleaMarket_SoldBy": "Sold by %1",
   "IGUI_PhleaMarket_Back": "< Back",
   "IGUI_PhleaMarket_GroupHeading": "%1 - from %2 each, %3 listings",
   "IGUI_PhleaMarket_GroupHeadingFlat": "%1 - %2 each, %3 listings",
