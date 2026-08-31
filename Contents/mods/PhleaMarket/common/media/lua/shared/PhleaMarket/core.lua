@@ -308,26 +308,22 @@ end
 --- its base context from, long after every mod's shared Lua has loaded, so
 --- appending here is enough to have PhleaMarket compiled alongside the sixteen
 --- machines PhunMart ships.
-table.insert(Core.defaultPaths.shops, "PhleaMarket/defaults/shops")
-
---- Whether a machine should stand in the world at all.
+--- Append once, however many times this file is executed.
 ---
---- Read by the shop definition, which is compiled after this file has loaded.
---- Off, the definition disables itself and placement skips it.
----
---- Singleplayer with no simulated sellers is the case worth refusing. The
---- machine works perfectly there and has nothing in it and nobody who could
---- ever put anything in it, which is a worse first impression than the machine
---- not existing. Turn simulated sellers on and it appears.
-function Market.shouldPlace()
-    if not Market.isEnabled() then
-        return false
+--- The game loads a mod's shared files itself, and other files here also
+--- `require` this one. Those are two different caches, so this can run twice in
+--- one session -- harmless for a function definition, not harmless for a list
+--- that something appends to on every pass.
+local function registerOnce(list, value)
+    for _, existing in ipairs(list) do
+        if existing == value then
+            return
+        end
     end
-    if Core.isLocal and not Market.getOption("SimulatedSellers", false) then
-        return false
-    end
-    return true
+    table.insert(list, value)
 end
+
+registerOnce(Core.defaultPaths.shops, "PhleaMarket/defaults/shops")
 
 --- Keep the `consignment` flag through compilation.
 ---
@@ -336,6 +332,6 @@ end
 --- smuggling arbitrary keys into the runtime. A flag this mod invents is not on
 --- that list, so without this it would be gone before the shop window ever saw
 --- it, and the Sell mode keyed on it would simply never appear.
-table.insert(Core.shopDefPassthrough, "consignment")
+registerOnce(Core.shopDefPassthrough, "consignment")
 
 return Market
