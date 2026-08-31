@@ -7,6 +7,11 @@
 --
 return {
     PhleaMarket = {
+        -- Read at compile time. A market with nobody in it and nobody who could
+        -- ever be in it -- singleplayer with the simulated sellers off -- is a
+        -- worse first impression than no machine at all, so it does not spawn.
+        enabled = PhleaMarket.shouldPlace(),
+
         probability = 5,
         minDistance = 500,
         category = "PhleaMarket",

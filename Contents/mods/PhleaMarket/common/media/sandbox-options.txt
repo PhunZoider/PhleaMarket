@@ -16,6 +16,16 @@ option PhleaMarket.SimulatedSellers
     translation = PhleaMarket_SimulatedSellers,
 }
 
+option PhleaMarket.SimulatedCount
+{
+    type = integer,
+    default = 20,
+    min = 0,
+    max = 500,
+    page = PhleaMarket,
+    translation = PhleaMarket_SimulatedCount,
+}
+
 option PhleaMarket.DurationShortHours
 {
     type = integer,

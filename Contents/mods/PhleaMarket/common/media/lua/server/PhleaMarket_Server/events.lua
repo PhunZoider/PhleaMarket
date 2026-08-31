@@ -13,6 +13,7 @@ local Market = PhleaMarket
 local Listings = require "PhleaMarket/listings"
 local Store = require "PhleaMarket_Server/store"
 local Commands = require "PhleaMarket_Server/commands"
+local Simulated = require "PhleaMarket_Server/simulated"
 
 ---------------------------------------------------------------------------
 -- Incoming
@@ -84,9 +85,14 @@ local function tick()
         returnsAfterHours = Market.getOption("ReturnsExpiryHours", 336)
     })
 
-    if #expired > 0 or dropped > 0 or abandoned > 0 then
+    -- After the sweep, so a listing that just expired is a gap this can fill on
+    -- the same tick rather than the next one.
+    local added = Simulated.tick(store, now)
+
+    if #expired > 0 or dropped > 0 or abandoned > 0 or added > 0 then
         Store.save()
-        Market.debugLn(("tick: %d expired, %d purged, %d abandoned"):format(#expired, dropped, abandoned))
+        Market.debugLn(("tick: %d expired, %d purged, %d abandoned, %d simulated"):format(#expired, dropped,
+            abandoned, added))
     end
 end
 

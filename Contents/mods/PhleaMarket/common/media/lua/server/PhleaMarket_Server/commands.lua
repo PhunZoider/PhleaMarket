@@ -208,10 +208,20 @@ Commands[C.buy] = function(playerObj, args)
     -- And only now is the seller paid. Through the capped path, so the market
     -- cannot be used to lift a balance past the ceiling every earn rate in
     -- PhunMart is set against.
-    local paid, held = Store.creditCapped(sale.seller, sale.pool, sale.net)
-    if held > 0 then
-        Listings.addCredit(store, sale.seller, sale.pool, held, Listings.REASON.WALLET_FULL, sale.listingId,
-            Store.now())
+    --
+    -- Unless there is nobody to pay. A simulated listing has a name but no
+    -- wallet behind it, and crediting one would put money into a record that no
+    -- player can ever spend -- harmless, but it would also leave a returns queue
+    -- filling up under a survivor who does not exist. The buyer still pays: the
+    -- money leaves the economy, which is what a purchase from a stranger who
+    -- wandered off should do.
+    local paid, held = 0, 0
+    if not sale.simulated then
+        paid, held = Store.creditCapped(sale.seller, sale.pool, sale.net)
+        if held > 0 then
+            Listings.addCredit(store, sale.seller, sale.pool, held, Listings.REASON.WALLET_FULL, sale.listingId,
+                Store.now())
+        end
     end
 
     Store.log({

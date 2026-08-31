@@ -310,6 +310,25 @@ end
 --- machines PhunMart ships.
 table.insert(Core.defaultPaths.shops, "PhleaMarket/defaults/shops")
 
+--- Whether a machine should stand in the world at all.
+---
+--- Read by the shop definition, which is compiled after this file has loaded.
+--- Off, the definition disables itself and placement skips it.
+---
+--- Singleplayer with no simulated sellers is the case worth refusing. The
+--- machine works perfectly there and has nothing in it and nobody who could
+--- ever put anything in it, which is a worse first impression than the machine
+--- not existing. Turn simulated sellers on and it appears.
+function Market.shouldPlace()
+    if not Market.isEnabled() then
+        return false
+    end
+    if Core.isLocal and not Market.getOption("SimulatedSellers", false) then
+        return false
+    end
+    return true
+end
+
 --- Keep the `consignment` flag through compilation.
 ---
 --- The compiler builds each runtime.shops entry from an explicit list of field

@@ -291,7 +291,11 @@ function Listings.create(store, params)
         commission = params.commission,
         listedAt = now,
         expiresAt = now + hours,
-        status = Listings.STATUS.ACTIVE
+        status = Listings.STATUS.ACTIVE,
+        -- A listing nobody really made. Everything about browsing and buying
+        -- one is identical; what differs is that there is no seller behind it
+        -- to pay, and nothing to hand back when it expires.
+        simulated = params.simulated == true or nil
     }
 
     store.listings[id] = listing
@@ -382,6 +386,8 @@ function Listings.buy(store, id, buyer, qty, nowHours)
         -- True when this emptied the listing, so the caller knows whether the
         -- seller has anything left on the shelf without re-reading it.
         soldOut = listing.status == Listings.STATUS.SOLD,
+        -- Carried so the caller knows not to look for a wallet to pay into.
+        simulated = listing.simulated == true,
         -- A seller buying their own listing is allowed: with proceeds credited
         -- through a capped path it cannot inflate anything, and it is a strictly
         -- worse Cancel, since they pay commission to get their own item back.
@@ -441,15 +447,23 @@ function Listings.expireDue(store, nowHours)
             -- record how much actually went back: a listing that sold most of
             -- its stack returns the remainder, not what it started with.
             listing.returned = remaining
-            Listings.addReturn(store, listing.seller, {
-                snapshot = listing.snapshot,
-                fullType = listing.fullType,
-                itemName = listing.itemName,
-                qty = remaining,
-                unitPrice = listing.unitPrice,
-                listingId = id,
-                reason = Listings.REASON.EXPIRED
-            })
+
+            -- A listing nobody made has nobody to hand anything back to. It
+            -- simply goes, rather than filling a returns queue under a name
+            -- that will never walk up to a machine to empty it.
+            if listing.simulated then
+                listing.returned = 0
+            else
+                Listings.addReturn(store, listing.seller, {
+                    snapshot = listing.snapshot,
+                    fullType = listing.fullType,
+                    itemName = listing.itemName,
+                    qty = remaining,
+                    unitPrice = listing.unitPrice,
+                    listingId = id,
+                    reason = Listings.REASON.EXPIRED
+                })
+            end
             table.insert(expired, listing)
         end
     end

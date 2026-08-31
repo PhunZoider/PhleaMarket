@@ -7,6 +7,9 @@
   "Sandbox_PhleaMarket_SimulatedSellers": "Simulated sellers",
   "Sandbox_PhleaMarket_SimulatedSellers_tooltip": "Fill the market with listings from survivors who do not exist, so it is worth visiting on a quiet server. Also what makes the machine appear in singleplayer, where there is otherwise nobody to buy from.",
 
+  "Sandbox_PhleaMarket_SimulatedCount": "Simulated listings",
+  "Sandbox_PhleaMarket_SimulatedCount_tooltip": "How many listings the simulated sellers keep on the market. They are drawn from what the machines themselves sell, at prices around what the machines charge, so the fake market stays anchored to your economy. Only used when simulated sellers are on.",
+
   "Sandbox_PhleaMarket_DurationShortHours": "Short listing, hours",
   "Sandbox_PhleaMarket_DurationShortHours_tooltip": "How long a short listing stays up, in in-game hours. Set all three durations to the same number for a single fixed listing length.",
 

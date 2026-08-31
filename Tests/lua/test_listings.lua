@@ -407,6 +407,89 @@ do
     ok("no phantom return is queued", #L.peekReturns(store, "steve").items == 0)
 end
 
+print("-- listings nobody made --")
+do
+    -- A simulated listing browses and sells exactly like any other. The two
+    -- differences are absences: no wallet behind the name to pay, and nothing
+    -- to hand back when it expires.
+    local store = L.newStore()
+    local fake = L.create(store, {
+        seller = "npc:4821",
+        sellerChar = "Hazel Sizemore",
+        snapshot = {
+            fullType = "Base.Axe"
+        },
+        fullType = "Base.Axe",
+        itemName = "Axe",
+        qty = 1,
+        unitPrice = {
+            pool = "change",
+            amount = 300
+        },
+        durationHours = 24,
+        commission = PERCENT_5,
+        nowHours = 1000,
+        simulated = true
+    })
+    ok("is created like any other", fake ~= nil and fake.status == L.STATUS.ACTIVE)
+    ok("and is marked", fake.simulated == true)
+
+    -- Browsing must not tell them apart, or the filter and the price guide
+    -- would quietly disagree with the grid.
+    ok("appears in the summary", #L.summarise(store) == 1)
+    ok("and counts towards the price guide", L.priceGuide(store, "Base.Axe").count == 1)
+
+    local sale = L.buy(store, fake.id, "dave", 1, 1005)
+    ok("sells normally", sale ~= nil and sale.gross == 300)
+    ok("commission still applies", sale.commission == 15)
+    -- The caller needs to know there is nobody to pay. The buyer still pays:
+    -- the money leaves the economy, which is what buying from a stranger who
+    -- wandered off ought to do.
+    ok("the settlement says nobody is owed", sale.simulated == true)
+
+    local real = L.newStore()
+    local mine = list(real)
+    ok("an ordinary sale is not flagged", L.buy(real, mine.id, "dave", 1, 1005).simulated == false)
+end
+
+print("-- a simulated listing expiring --")
+do
+    local store = L.newStore()
+    L.create(store, {
+        seller = "npc:99",
+        snapshot = {
+            fullType = "Base.Axe"
+        },
+        fullType = "Base.Axe",
+        qty = 3,
+        unitPrice = {
+            pool = "change",
+            amount = 100
+        },
+        durationHours = 10,
+        commission = PERCENT_5,
+        nowHours = 1000,
+        simulated = true
+    })
+
+    local expired = L.expireDue(store, 1010)
+    ok("expires", #expired == 1)
+    -- The whole point: no returns queue accumulating under a survivor who will
+    -- never walk up to a machine to empty it.
+    ok("queues nothing for a seller who does not exist", #L.peekReturns(store, "npc:99").items == 0)
+    ok("and says nothing went back", expired[1].returned == 0)
+
+    -- A real listing beside it still returns, so the skip is about the flag
+    -- rather than about expiry.
+    local both = L.newStore()
+    list(both, {
+        nowHours = 1000,
+        durationHours = 10
+    })
+    L.expireDue(both, 1010)
+    ok("a real one still returns its goods", #L.peekReturns(both, "steve").items == 1)
+end
+
 print("-- credits, and the wallet cap --")
 do
     -- The market must not become a way around ChangeCapCents. Proceeds that do
