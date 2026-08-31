@@ -90,24 +90,43 @@ function UI:createChildren()
         label = getText("IGUI_PhleaMarket_Adm_Ledger")
     }})
 
+    -- Every column sorts. `sort` is opt-in per column rather than a property of
+    -- the panel, so a column that has no meaningful order can simply not offer
+    -- one; here they all do.
+    --
+    -- The three on the right sort on a number rather than on what they display,
+    -- because what they display is text: sorted as written, 9 comes after 10,
+    -- $1.00 after $0.05, and "3d" after "20h". A column that sorts visibly
+    -- wrongly is worse than one that does not sort at all.
     self:addListColumn(getText("IGUI_PhleaMarket_Adm_Item"), 0, {
-        field = "name"
+        field = "name",
+        sort = true
     })
     self:addListColumn(getText("IGUI_PhleaMarket_Adm_Seller"), 0.34, {
         field = "who",
-        color = {0.75, 0.75, 0.75}
+        color = {0.75, 0.75, 0.75},
+        sort = true
     })
     self:addListColumn(getText("IGUI_PhleaMarket_Adm_Qty"), 0.55, {
         field = "qtyText",
-        align = "right"
+        align = "right",
+        sort = function(data)
+            return data.qtyValue or 0
+        end
     })
     self:addListColumn(getText("IGUI_PhleaMarket_Adm_Price"), 0.66, {
         field = "priceText",
-        align = "right"
+        align = "right",
+        sort = function(data)
+            return data.priceValue or 0
+        end
     })
     self:addListColumn(getText("IGUI_PhleaMarket_Adm_When"), 0.80, {
         field = "whenText",
-        color = {0.7, 0.7, 0.7}
+        color = {0.7, 0.7, 0.7},
+        sort = function(data)
+            return data.whenValue or 0
+        end
     })
 
     self:addBottomButton(getText("IGUI_PhleaMarket_Adm_Refresh"), self.onRefresh)
@@ -125,8 +144,16 @@ function UI:onRefresh()
     self:requestData()
 end
 
+--- What the filter box searches.
+---
+--- The base falls back to the row's display text when a panel does not answer
+--- this, which is effectively the first column alone. Everything worth looking
+--- something up by goes in: the item name and its type, the seller by character
+--- and by account, the status, and the ledger event -- so "BUY", "steve",
+--- "Base.Axe" and "EXPIRED" all find what a person means by them.
 function UI:getFilterText(itemData)
-    return (itemData.name or "") .. " " .. (itemData.who or "") .. " " .. (itemData.status or "")
+    return table.concat({itemData.name or "", itemData.fullType or "", itemData.who or "", itemData.status or "",
+                         itemData.event or ""}, " ")
 end
 
 function UI:rowInFilterTab(itemData, tabKey)
@@ -161,10 +188,17 @@ function UI:refreshList()
             -- a ban is applied to an account and a complaint names a survivor.
             who = (listing.sellerChar or listing.seller or "?") .. " (" .. (listing.seller or "?") .. ")",
             status = listing.status,
+            fullType = listing.fullType,
             qtyText = tostring(listing.qty or 0) .. "/" .. tostring(listing.qtyListed or 0),
             priceText = Market.formatAmount(pool, unit),
             whenText = listing.status == Listings.STATUS.ACTIVE and relativeHours(listing.expiresAt) or
-                (listing.status or ""):lower()
+                (listing.status or ""):lower(),
+            -- What the three right-hand columns sort on. Kept beside the text
+            -- rather than parsed back out of it, which is the other way this
+            -- gets done and the way that breaks the moment the wording changes.
+            qtyValue = listing.qty or 0,
+            priceValue = unit,
+            whenValue = listing.expiresAt or listing.listedAt or 0
         })
     end
 
@@ -179,9 +213,14 @@ function UI:refreshList()
             key = "log:" .. i,
             name = (entry.event or "?") .. "  " .. (entry.item or ""),
             who = entry.actor or "?",
+            event = entry.event,
+            fullType = entry.item,
             qtyText = entry.qty and tostring(entry.qty) or "",
             priceText = amount and Market.formatAmount("change", amount) or "",
-            whenText = relativeHours(entry.at)
+            whenText = relativeHours(entry.at),
+            qtyValue = entry.qty or 0,
+            priceValue = amount or 0,
+            whenValue = entry.at or 0
         })
     end
 end
