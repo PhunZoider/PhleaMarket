@@ -409,8 +409,34 @@ end
 ---------------------------------------------------------------------------
 
 Commands[C.browse] = function(playerObj, args)
+    local store = Store.get()
+
+    -- Both shapes, because the window wants both and neither is expensive.
+    -- `rows` is one line per item type, which is what a grouped grid and an
+    -- instant client-side search need. `listings` is every active listing,
+    -- projected, which is what a flat grid renders directly. Active listings
+    -- are bounded by the per-account limit times the player count, so this is
+    -- hundreds of small rows at worst.
+    local listings = {}
+    for id, listing in pairs(Listings.rebuildIndices(store).active) do
+        table.insert(listings, {
+            id = id,
+            seller = listing.seller,
+            sellerChar = listing.sellerChar,
+            fullType = listing.fullType,
+            itemName = listing.itemName,
+            qty = listing.qty,
+            unit = listing.unitPrice.amount,
+            pool = listing.unitPrice.pool,
+            expiresAt = listing.expiresAt,
+            condition = listing.snapshot and listing.snapshot.condition,
+            conditionMax = listing.snapshot and listing.snapshot.conditionMax
+        })
+    end
+
     Store.respond(playerObj, C.browseData, {
-        rows = Listings.summarise(Store.get())
+        rows = Listings.summarise(store),
+        listings = listings
     })
 end
 

@@ -83,6 +83,72 @@ function Market.feeFor(which, askingTotal)
     return math.floor((askingTotal or 0) * percent / 100)
 end
 
+--- The three listing lengths and what each multiplies the listing fee by.
+---
+--- Shared rather than server-only so the window can show the seller the exact
+--- fee the server is about to charge. Two copies of this arithmetic, one for
+--- display and one for the charge, is how a player ends up shown one number and
+--- billed another.
+Market.DURATIONS = {
+    short = {
+        hours = "DurationShortHours",
+        hoursDefault = 24,
+        multDefault = 1
+    },
+    medium = {
+        hours = "DurationMediumHours",
+        hoursDefault = 72,
+        mult = "DurationMediumMult",
+        multDefault = 2
+    },
+    long = {
+        hours = "DurationLongHours",
+        hoursDefault = 168,
+        mult = "DurationLongMult",
+        multDefault = 4
+    }
+}
+
+--- Hours and fee multiplier for a tier. Anything unrecognised is treated as
+--- medium, which is what an out-of-date client would send.
+function Market.duration(tier)
+    local spec = Market.DURATIONS[tier] or Market.DURATIONS.medium
+    local hours = Market.getOption(spec.hours, spec.hoursDefault)
+    local mult = spec.mult and Market.getOption(spec.mult, spec.multDefault) or spec.multDefault or 1
+    return hours, mult
+end
+
+--- The fee rules as they stand. Frozen onto a listing when it goes up, so a
+--- later change cannot reach back and tax something already on the shelf.
+function Market.commissionRule()
+    return {
+        mode = Market.getOption("CommissionMode", Market.FEE_PERCENT),
+        percent = Market.getOption("CommissionPercent", 5),
+        fixed = Market.getOption("CommissionFixed", 25)
+    }
+end
+
+function Market.listingFeeRule()
+    return {
+        mode = Market.getOption("ListingFeeMode", Market.FEE_PERCENT),
+        percent = Market.getOption("ListingFeePercent", 2),
+        fixed = Market.getOption("ListingFeeFixed", 0)
+    }
+end
+
+function Market.limits()
+    return {
+        maxListings = Market.getOption("MaxListings", 10),
+        maxQty = Market.getOption("MaxStackQty", 100),
+        minPrice = Market.getOption("MinPrice", 5),
+        maxPrice = Market.getOption("MaxPrice", 9999)
+    }
+end
+
+function Market.feePool()
+    return Market.getOption("FeePool", "change")
+end
+
 function Market.debugLn(str)
     if Core.settings and Core.settings.Debug then
         print("[PhleaMarket] " .. tostring(str))

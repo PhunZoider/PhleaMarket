@@ -88,65 +88,14 @@ end
 -- Settings, resolved once per call
 ---------------------------------------------------------------------------
 
-local DURATIONS = {
-    short = {
-        hours = "DurationShortHours",
-        default = 24,
-        mult = nil
-    },
-    medium = {
-        hours = "DurationMediumHours",
-        default = 72,
-        mult = "DurationMediumMult",
-        multDefault = 2
-    },
-    long = {
-        hours = "DurationLongHours",
-        default = 168,
-        mult = "DurationLongMult",
-        multDefault = 4
-    }
-}
-
---- Hours and fee multiplier for a duration tier. Falls back to medium for
---- anything unrecognised, which is what an out-of-date client would send.
-function Store.duration(tier)
-    local spec = DURATIONS[tier] or DURATIONS.medium
-    local hours = Market.getOption(spec.hours, spec.default)
-    local mult = spec.mult and Market.getOption(spec.mult, spec.multDefault) or 1
-    return hours, mult
-end
-
---- The commission rules as they stand right now, frozen onto a listing when it
---- goes up so a later change cannot reach back and tax it.
-function Store.commissionRule()
-    return {
-        mode = Market.getOption("CommissionMode", Listings.FEE_PERCENT),
-        percent = Market.getOption("CommissionPercent", 5),
-        fixed = Market.getOption("CommissionFixed", 25)
-    }
-end
-
-function Store.listingFeeRule()
-    return {
-        mode = Market.getOption("ListingFeeMode", Listings.FEE_PERCENT),
-        percent = Market.getOption("ListingFeePercent", 2),
-        fixed = Market.getOption("ListingFeeFixed", 0)
-    }
-end
-
-function Store.limits()
-    return {
-        maxListings = Market.getOption("MaxListings", 10),
-        maxQty = Market.getOption("MaxStackQty", 100),
-        minPrice = Market.getOption("MinPrice", 5),
-        maxPrice = Market.getOption("MaxPrice", 9999)
-    }
-end
-
-function Store.feePool()
-    return Market.getOption("FeePool", "change")
-end
+-- Settings live in core, shared with the client so the seller is shown the
+-- exact fee the server is about to charge rather than a second calculation of
+-- it. Aliased here because the call sites below read better for it.
+Store.duration = Market.duration
+Store.commissionRule = Market.commissionRule
+Store.listingFeeRule = Market.listingFeeRule
+Store.limits = Market.limits
+Store.feePool = Market.feePool
 
 function Store.now()
     return GameTime:getInstance():getWorldAgeHours()
