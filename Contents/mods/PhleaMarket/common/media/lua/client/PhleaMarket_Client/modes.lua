@@ -114,13 +114,27 @@ local function displayNameOf(fullType)
     return fullType
 end
 
+--- Remembered, because the answer for a type never changes and the question is
+--- asked a great many times.
+---
+--- fillCategories asks it once per listing, and the filter asks it again per
+--- listing whenever a category is chosen, both on every grid refresh. On a busy
+--- market that was several hundred script lookups per redraw for a table that
+--- could have been built once.
+local categoryCache = {}
+
 local function categoryOf(fullType)
+    local known = categoryCache[fullType]
+    if known then
+        return known
+    end
     local manager = getScriptManager()
     local script = manager and manager:getItem(fullType)
     local category = script and script:getDisplayCategory()
     if not category or category == "" then
-        return "Other"
+        category = "Other"
     end
+    categoryCache[fullType] = category
     return category
 end
 
@@ -489,6 +503,31 @@ local function listableInventory(player)
     return rows, order
 end
 
+--- The same, but not repeated for every redraw.
+---
+--- Reading a bag is not cheap. Every item is snapshotted to see which are
+--- alike, and a snapshot probes around nine engine calls, each a pcall through
+--- into Java. Three hundred items is some three thousand of those, and the grid
+--- used to refresh on every reply from the server, so one purchase paid for the
+--- whole scan three times over while standing in Sell.
+---
+--- Held until something could plausibly have changed the bag: entering the
+--- mode, and any answer coming back from the server, since listing, buying and
+--- collecting are the things that move items. Both clear it by hand.
+---
+--- Deliberately not watching for arbitrary inventory edits. The engine offers
+--- no cheap "has this changed" to ask, and inventing a fingerprint would mean
+--- touching every item, which is the cost being avoided. The worst case is a
+--- list one refresh out of date, which corrects itself the moment anything is
+--- done with it: the server checks what is really held and refuses otherwise.
+local function cachedListableInventory(ui, player)
+    if ui._phleaSell then
+        return ui._phleaSell
+    end
+    ui._phleaSell = listableInventory(player)
+    return ui._phleaSell
+end
+
 Core.registerShopMode({
     key = "sell",
     label = "IGUI_PhleaMarket_Mode_Sell",
@@ -504,8 +543,7 @@ Core.registerShopMode({
     end,
 
     getGridData = function(ui)
-        local rows = listableInventory(ui.player)
-        ui._phleaSell = rows
+        local rows = cachedListableInventory(ui, ui.player)
         local offers = {}
         for fullType, row in pairs(rows) do
             -- Priced at nothing: the seller has not said what they want for it
@@ -712,9 +750,28 @@ end
 -- Redrawing when an answer arrives
 ---------------------------------------------------------------------------
 
--- The window asks and carries on. When the reply lands the grid is rebuilt from
--- whatever mode is showing, so a mode never has to know which reply it was
--- waiting for.
+-- Which replies each mode is actually drawn from.
+--
+-- Every mode used to redraw on every reply, and a purchase produces three of
+-- them, so buying one box of shells rebuilt the grid three times over. That is
+-- merely wasteful in Buy and expensive in Sell, where a rebuild reads the whole
+-- inventory. A reply a mode does not draw from cannot change what it is showing.
+--
+-- "result" is in every list because it means something moved: money, goods, or
+-- both. Sell is drawn from the bag rather than from the server, and that is the
+-- one reply that can have changed the bag.
+-- Returns is listed against "mine" rather than a reply of its own because the
+-- uncollected queue rides along on the mine payload. There is no returns reply.
+local REDRAWS_ON = {
+    market  = {browse = true, group = true, result = true},
+    sell    = {result = true},
+    mine    = {mine = true, result = true},
+    returns = {mine = true, result = true}
+}
+
+-- The window asks and carries on. When a reply the current mode is drawn from
+-- lands, the grid is rebuilt, so a mode never has to know which reply it was
+-- waiting for beyond naming them once above.
 Events[Market.events.OnData].Add(function(kind, payload)
     local window = Modes.window
     -- Closed since it asked, or never opened. onEnter sets this and nothing
@@ -724,8 +781,14 @@ Events[Market.events.OnData].Add(function(kind, payload)
     end
     if kind == "result" and payload and payload.failed then
         window:showFeedback(Market.ui.failureText(payload.message), 0.9, 0.3, 0.3)
+        -- Deliberately falls through to the redraw below without re-asking. A
+        -- refusal moved nothing, so the bag is untouched, but "somebody got
+        -- there first" means what is on screen is already wrong and wants
+        -- drawing again from what the client last heard.
     elseif kind == "result" then
         window:showFeedback(Market.ui.successText(payload), 0.4, 0.9, 0.4)
+        -- Something left or entered the bag, so the Sell scan has to be redone.
+        window._phleaSell = nil
         -- A sale, a cancel or a collect all change what every mode is showing,
         -- so ask again rather than working out which.
         Client.send(C.browse)
@@ -745,6 +808,14 @@ Events[Market.events.OnData].Add(function(kind, payload)
     -- the count are only known once the listings arrive.
     if kind == "group" and window.buildModeFilter then
         window:buildModeFilter()
+    end
+
+    -- Only the mode on screen, and only for a reply it is drawn from. An
+    -- unknown mode redraws on everything, since a mode registered by some other
+    -- mod is not ours to make assumptions about.
+    local wanted = REDRAWS_ON[window.modeKey]
+    if wanted and not wanted[kind] then
+        return
     end
     if window.refreshGrid then
         window:refreshGrid()

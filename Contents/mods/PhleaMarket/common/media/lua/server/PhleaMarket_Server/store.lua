@@ -22,6 +22,7 @@ local Core = PhunMart
 local Market = PhleaMarket
 local Listings = require "PhleaMarket/listings"
 local Snapshot = require "PhleaMarket/item_snapshot"
+local Chunk = require "PhleaMarket/chunking"
 
 local Store = {}
 Market.store = Store
@@ -273,6 +274,28 @@ function Store.respond(playerObj, command, payload)
     else
         sendServerCommand(playerObj, Market.module, command, payload or {})
     end
+end
+
+--- Answer a player with a reply whose bulk is one list, cutting it up if it has
+--- grown large enough to be worth cutting up.
+---
+--- `field` names the list. See PhleaMarket/chunking for what goes in a part and
+--- how the client puts them back; the point of it being there rather than here
+--- is that both ends read the one description.
+---
+--- Singleplayer never chunks, and neither does anything under the threshold.
+--- There is no wire to be too big for locally: the event path hands the same
+--- table straight over, so cutting it up would be work with nothing to show.
+function Store.respondChunked(playerObj, command, payload, field)
+    payload = payload or {}
+
+    if Core.isLocal or not Chunk.needed(payload, field) then
+        return Store.respond(playerObj, command, payload)
+    end
+
+    Chunk.split(payload, field, Chunk.SIZE, function(part)
+        sendServerCommand(playerObj, Market.module, command, part)
+    end)
 end
 
 return Store

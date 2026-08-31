@@ -133,15 +133,39 @@ function UI:createChildren()
     self:addBottomButton(getText("IGUI_PhleaMarket_Adm_Pull"), self.onPull, true)
 end
 
+--- Ask the server for what this panel is showing.
+---
+--- The ledger is only fetched while the Ledger tab is the one on screen. It is
+--- the largest thing this mod ever sends, capped by a setting an admin may put
+--- into the thousands, and it used to be fetched again on every result, so
+--- pulling one listing dragged the entire history down the wire behind it. The
+--- other two tabs never render a ledger row, so they never need one.
+---
+--- Switching to the Ledger asks for it, which is the tab change below.
 function UI:requestData()
     Client.send(C.adminList)
-    Client.send(C.adminLog)
+    if self._activeFilterTab == "log" then
+        Client.send(C.adminLog)
+    end
 end
 
 UI.refresh = UI.requestData
 
 function UI:onRefresh()
     self:requestData()
+end
+
+--- Fetch the ledger the first time it is asked to be shown.
+---
+--- The base switches tab and refilters, which is all the other two need since
+--- their rows are already here. The ledger is not fetched up front, so opening
+--- that tab is the moment to go and get it. Once only: it is asked for again on
+--- any result while the tab is up, and Refresh is there for anything else.
+function UI:onFilterTabClick(btn)
+    ListPanel.onFilterTabClick(self, btn)
+    if self._activeFilterTab == "log" and not self.log then
+        Client.send(C.adminLog)
+    end
 end
 
 --- What the filter box searches.

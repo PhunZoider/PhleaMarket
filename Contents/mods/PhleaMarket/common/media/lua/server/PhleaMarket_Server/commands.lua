@@ -491,10 +491,13 @@ Commands[C.browse] = function(playerObj, args)
         })
     end
 
-    Store.respond(playerObj, C.browseData, {
+    -- Chunked on the listings, which is the half that grows with the market.
+    -- `rows` is one line per item type, so it can never be the longer of the
+    -- two, and it rides along as a header.
+    Store.respondChunked(playerObj, C.browseData, {
         rows = Listings.summarise(store),
         listings = listings
-    })
+    }, "listings")
 end
 
 Commands[C.group] = function(playerObj, args)
@@ -596,9 +599,9 @@ Commands[C.adminList] = function(playerObj, args)
     table.sort(all, function(a, b)
         return (a.listedAt or 0) > (b.listedAt or 0)
     end)
-    Store.respond(playerObj, C.adminData, {
+    Store.respondChunked(playerObj, C.adminData, {
         listings = all
-    })
+    }, "listings")
 end
 
 Commands[C.adminCancel] = function(playerObj, args)
@@ -633,9 +636,11 @@ Commands[C.adminLog] = function(playerObj, args)
     if not Core.utils.isAdmin(playerObj) then
         return
     end
-    Store.respond(playerObj, C.adminData, {
+    -- The one reply with a configured ceiling rather than a natural one, and an
+    -- admin may set that ceiling into the thousands.
+    Store.respondChunked(playerObj, C.adminData, {
         log = Store.get().log or {}
-    })
+    }, "log")
 end
 
 return Commands

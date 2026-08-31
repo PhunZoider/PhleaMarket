@@ -16,6 +16,7 @@ require "PhleaMarket/commands"
 local Core = PhunMart
 local Market = PhleaMarket
 local C = Market.commands
+local Chunk = require "PhleaMarket/chunking"
 
 local Client = {}
 Market.client = Client
@@ -79,12 +80,38 @@ handlers[C.adminData] = function(payload)
     triggerEvent(Market.events.OnData, "admin", payload)
 end
 
+---------------------------------------------------------------------------
+-- Replies that arrived in pieces
+---------------------------------------------------------------------------
+
+--- Parts collected so far, per command.
+---
+--- Keyed by command rather than pooled, so a browse arriving while an admin
+--- listing is still coming in cannot walk into the middle of it.
+local partial = {}
+
+--- Put a chunked reply back together, or nil while there is more to come.
+---
+--- The rule itself is in PhleaMarket/chunking, alongside the half that cuts the
+--- reply up. Everything above this line is written as though replies arrive
+--- whole, and this is what keeps that true.
+local function reassemble(command, payload)
+    local whole, why = Chunk.join(partial, command, payload)
+    if why then
+        Market.debugLn("dropped an orphaned chunk of " .. tostring(command))
+    end
+    return whole
+end
+
 local function dispatch(command, payload)
     local handler = handlers[command]
-    if handler then
-        handler(payload or {})
-    else
+    if not handler then
         Market.debugLn("unhandled reply " .. tostring(command))
+        return
+    end
+    local whole = reassemble(command, payload or {})
+    if whole then
+        handler(whole)
     end
 end
 
