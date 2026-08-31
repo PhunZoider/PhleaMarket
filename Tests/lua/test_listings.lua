@@ -388,6 +388,11 @@ do
     L.expireDue(store, 1010)
     local items = L.peekReturns(store, "steve").items
     ok("three come back, not ten", items[1] and items[1].qty == 3, items[1] and tostring(items[1].qty))
+    -- qty is zero by the time expireDue returns, so the amount that actually
+    -- went back is kept separately. The ledger records this, and a ledger that
+    -- says every expiry returned nothing is a ledger nobody can settle an
+    -- argument with.
+    ok("and the listing says how much went back", listing.returned == 3, tostring(listing.returned))
 end
 
 print("-- a listing that sold out has nothing to return --")

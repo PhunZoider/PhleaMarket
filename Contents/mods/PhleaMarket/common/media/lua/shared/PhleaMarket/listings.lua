@@ -437,6 +437,10 @@ function Listings.expireDue(store, nowHours)
             listing.status = Listings.STATUS.EXPIRED
             local remaining = listing.qty
             listing.qty = 0
+            -- Kept because qty is about to be zero and the caller wants to
+            -- record how much actually went back: a listing that sold most of
+            -- its stack returns the remainder, not what it started with.
+            listing.returned = remaining
             Listings.addReturn(store, listing.seller, {
                 snapshot = listing.snapshot,
                 fullType = listing.fullType,

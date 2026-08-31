@@ -90,6 +90,93 @@ function Market.debugLn(str)
 end
 
 ---------------------------------------------------------------------------
+-- What may be listed
+---------------------------------------------------------------------------
+
+-- Never listable, whatever an admin says.
+--
+-- Currency would let a player launder a capped pool through the market. The
+-- dropped wallet is somebody's balance in item form. The vehicle key spawner
+-- rolls a car when it is used, so a listing of one is a listing of a car nobody
+-- has seen. None of these are things a server owner should have to think to
+-- block.
+local NEVER = {
+    ["PhunMart.DroppedWallet"] = true,
+    ["PhunMart.VehicleKeySpawner"] = true
+}
+
+--- Rules an admin adds, in three kinds.
+---
+--- Exact types alone would mean enumerating every food item in Build 42 to say
+--- "no food", which is not a reasonable thing to ask. Category is the script
+--- item's display category; tag is for the cross-cutting cases a category
+--- misses.
+---
+--- Deliberately its own list rather than PhunMart's global blacklist: that one
+--- answers a different question -- what a machine may not stock -- and adding
+--- to it would change what the other sixteen machines sell.
+Market.blocked = {
+    types = {},
+    categories = {},
+    tags = {}
+}
+
+--- Whether a table holds anything.
+---
+--- `next` is not handed to mod code in B42.20.4, so the usual `next(t) ~= nil`
+--- is a call to a nil value. pairs still works, because it reaches next below
+--- the C boundary rather than through the global.
+local function hasAny(tbl)
+    for _ in pairs(tbl) do
+        return true
+    end
+    return false
+end
+
+--- Whether a player may put this item type up for sale.
+function Market.isListable(fullType)
+    if type(fullType) ~= "string" or fullType == "" then
+        return false
+    end
+    if NEVER[fullType] or Market.blocked.types[fullType] then
+        return false
+    end
+    -- Currency is asked of PhunMart rather than listed here, so a server that
+    -- adds a coin of its own does not have to remember to block it too.
+    if Core.wallet and Core.wallet:isCurrency(fullType) then
+        return false
+    end
+
+    local manager = type(getScriptManager) == "function" and getScriptManager()
+    local script = manager and manager:FindItem(fullType)
+    if not script then
+        -- Unknown to the game: refuse rather than escrow something that cannot
+        -- be built again.
+        return false
+    end
+
+    if hasAny(Market.blocked.categories) and script.getDisplayCategory then
+        local category = script:getDisplayCategory()
+        if category and Market.blocked.categories[category] then
+            return false
+        end
+    end
+
+    if hasAny(Market.blocked.tags) and script.getTags then
+        local ok, tags = pcall(script.getTags, script)
+        if ok and tags and tags.size then
+            for i = 0, tags:size() - 1 do
+                if Market.blocked.tags[tags:get(i)] then
+                    return false
+                end
+            end
+        end
+    end
+
+    return true
+end
+
+---------------------------------------------------------------------------
 -- Hooks into PhunMart
 --
 -- All four run at load time, which is the window they have to run in: the
