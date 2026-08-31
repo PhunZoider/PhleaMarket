@@ -75,6 +75,7 @@ end
 ---------------------------------------------------------------------------
 
 local candidates
+local reported
 
 --- Things the machines themselves sell, at the prices they sell them for.
 ---
@@ -87,7 +88,14 @@ local candidates
 --- in items, or one that hands over a trait or a vehicle, is not something a
 --- survivor can be pictured carrying to a market stall.
 function Simulated.candidates()
-    if candidates then
+    -- Only a list with something in it counts as cached.
+    --
+    -- `if candidates then` was wrong, and wrong in the way that never announces
+    -- itself: an empty table is truthy, so one call made before the definitions
+    -- had compiled -- which is exactly when the first tick can land -- cached
+    -- nothing and answered nothing for the rest of the session. The market
+    -- stayed empty with the setting on and no error anywhere.
+    if candidates and #candidates > 0 then
         return candidates
     end
     candidates = {}
@@ -117,14 +125,35 @@ function Simulated.candidates()
         end
     end
 
-    Market.debugLn("simulated: " .. #candidates .. " candidate items drawn from the pools")
+    -- Printed once and unconditionally, not through debugLn.
+    --
+    -- "Simulated sellers are on and the market is still empty" is a question an
+    -- admin will ask, and the answer is entirely in this number. Requiring them
+    -- to find PhunMart's debug switch first, on another mod's settings page, to
+    -- learn that this mod found nothing to sell, is a bad trade for one line at
+    -- startup. It says it once: an empty result is not cached, so this would
+    -- otherwise repeat on every tick forever.
+    if not reported or #candidates > 0 then
+        reported = true
+        print("[PhleaMarket] simulated sellers: " .. #candidates .. " item types available to stock, drawn from " ..
+                  "PhunMart's pools")
+    end
     return candidates
 end
 
 --- Forget the cached candidates, so the next tick reads the pools again.
---- Called when definitions recompile, since prices may have moved.
+---
+--- Bound to PhunMart recompiling below: prices move when an admin edits them,
+--- and a market quoting last hour's prices is a market drifting away from the
+--- economy it is supposed to be anchored to.
 function Simulated.invalidate()
     candidates = nil
+end
+
+-- A recompile is also the moment the pools first exist, so this doubles as the
+-- signal that there is finally something to stock from.
+if Core.events and Core.events.OnDefsUpdated then
+    Events[Core.events.OnDefsUpdated].Add(Simulated.invalidate)
 end
 
 ---------------------------------------------------------------------------
