@@ -365,41 +365,69 @@ end
 -- Stacking
 ---------------------------------------------------------------------------
 
---- Whether every one of these is interchangeable with every other.
+--- Whether two snapshots describe the same thing in every way that is kept.
 ---
---- Fifty nails should be one listing with a price per nail, not fifty listings.
---- Fifty axes should not, because a snapshot holds one exemplar and the other
---- forty-nine would come back wearing its condition. So the question is not
---- "does this item stack in the inventory" but "would a buyer be able to tell
---- two of them apart".
+--- This is what decides whether several items can travel as one listing, and it
+--- is the whole test: a listing holds one snapshot, so a stack is faithful
+--- exactly when every item in it would have produced that same snapshot.
 ---
---- Anything carrying state says no: condition, drainable charge, food age, a
---- name someone typed, a colour, a weight, or mod data, which is where another
---- mod keeps whatever makes its items individual.
-function Snapshot.isStackable(item)
-    local snap = Snapshot.capture(item)
-    return Snapshot.isStackableSnapshot(snap)
+--- An earlier version asked a different and wrong question -- whether the item
+--- type carried any state at all, refusing a stack for anything with a
+--- condition on the grounds that two of them "could diverge". They cannot.
+--- Listing escrows them on the spot, so whatever they were at that moment is
+--- what they are forever after. Three pristine hats are three pristine hats.
+--- The old rule also refused ammunition, which carries a condition it never
+--- uses, and so made selling a hundred shotgun shells a hundred listings.
+function Snapshot.equal(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then
+        return false
+    end
+
+    local function same(x, y)
+        if type(x) ~= type(y) then
+            return false
+        end
+        if type(x) ~= "table" then
+            return x == y
+        end
+        for k, v in pairs(x) do
+            if not same(v, y[k]) then
+                return false
+            end
+        end
+        for k in pairs(y) do
+            if x[k] == nil then
+                return false
+            end
+        end
+        return true
+    end
+
+    -- `v` is deliberately included: two snapshots taken under different rules
+    -- are not known to describe the same item, whatever their fields say.
+    return same(a, b)
 end
 
---- The same question asked of a snapshot rather than an item, so a listing can
---- be checked after the item itself is gone.
-function Snapshot.isStackableSnapshot(snap)
-    if type(snap) ~= "table" then
-        return false
+--- How many of these are alike enough to sell as one stack.
+---
+--- Compared against the first rather than grouped: the first is the one whose
+--- snapshot the listing will hold, so the only question about any other item is
+--- whether it matches that one.
+function Snapshot.countAlike(items)
+    if type(items) ~= "table" or #items == 0 then
+        return 0, nil
     end
-    if snap.condition ~= nil or snap.usedDelta ~= nil then
-        return false
+    local first = Snapshot.capture(items[1])
+    if not first then
+        return 0, nil
     end
-    if snap.age ~= nil or snap.hungChange ~= nil then
-        return false
+    local n = 0
+    for _, item in ipairs(items) do
+        if Snapshot.equal(first, Snapshot.capture(item)) then
+            n = n + 1
+        end
     end
-    if snap.name ~= nil or snap.favorite ~= nil or snap.color ~= nil or snap.weight ~= nil then
-        return false
-    end
-    if snap.modData ~= nil then
-        return false
-    end
-    return true
+    return n, first
 end
 
 return Snapshot

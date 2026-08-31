@@ -197,14 +197,11 @@ function Simulated.addOne(store, now)
         unit = limits.maxPrice
     end
 
-    -- Only where every one really is interchangeable. Asking the item itself is
-    -- the same question a player's listing has to answer, and answering it the
-    -- same way is what stops simulated stock behaving unlike real stock.
-    local qty = 1
+    -- Stacks are safe here by construction: every one of these is built fresh
+    -- from the same type, so they are identical to each other and one snapshot
+    -- describes them all -- the same rule a player's stack has to satisfy.
     local probe = type(instanceItem) == "function" and instanceItem(choice.fullType)
-    if probe and Snapshot.isStackable(probe) then
-        qty = 1 + ZombRand(8)
-    end
+    local qty = probe and (1 + ZombRand(8)) or 1
 
     local seller, sellerChar = makeSeller()
     local hours = Market.duration(ZombRand(3) == 0 and "short" or "medium")

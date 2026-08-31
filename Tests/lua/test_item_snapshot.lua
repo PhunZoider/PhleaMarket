@@ -536,61 +536,61 @@ do
     ok("and still records the type", okCall and snap and snap.fullType == "Base.Axe")
 end
 
-print("-- stackable: would a buyer tell two apart --")
+print("-- alike enough to sell as one stack --")
 do
-    ok("plain nails stack", Snapshot.isStackable(makeItem({
-        fullType = "Base.Nails"
-    })) == true)
+    local function snap(spec)
+        return Snapshot.capture(makeItem(spec))
+    end
 
-    ok("an axe does not, it has condition", Snapshot.isStackable(makeItem({
-        fullType = "Base.Axe",
-        condition = 10,
-        conditionMax = 10
-    })) == false)
+    ok("two of the same fresh item", Snapshot.equal(snap({fullType = "Base.Nails"}), snap({fullType = "Base.Nails"})))
 
-    ok("a bottle does not, it has a charge", Snapshot.isStackable(makeItem({
-        fullType = "Base.WaterBottle",
-        usedDelta = 0
-    })) == false)
+    -- The rule that used to be here refused these outright, because ammunition
+    -- carries a condition it never uses, and so made selling a hundred shotgun
+    -- shells a hundred listings.
+    ok("two identical items that happen to have a condition", Snapshot.equal(
+        snap({fullType = "Base.Hat", condition = 10, conditionMax = 10}),
+        snap({fullType = "Base.Hat", condition = 10, conditionMax = 10})))
 
-    ok("a steak does not, it has an age", Snapshot.isStackable(makeItem({
-        fullType = "Base.Steak",
-        age = 0,
-        hungChange = -10
-    })) == false)
+    -- Which is safe because listing escrows them: whatever they were at that
+    -- moment is what they are forever after, so they cannot drift apart.
+    ok("but not two at different condition", not Snapshot.equal(
+        snap({fullType = "Base.Hat", condition = 10, conditionMax = 10}),
+        snap({fullType = "Base.Hat", condition = 3, conditionMax = 10})))
 
-    ok("nails someone named do not", Snapshot.isStackable(makeItem({
-        fullType = "Base.Nails",
-        name = "Lucky",
-        customName = true
-    })) == false)
+    ok("nor a different type", not Snapshot.equal(snap({fullType = "Base.Nails"}), snap({fullType = "Base.Axe", condition = 5, conditionMax = 10})))
+    ok("nor one somebody named", not Snapshot.equal(snap({fullType = "Base.Nails"}),
+        snap({fullType = "Base.Nails", name = "Lucky", customName = true})))
+    ok("nor one carrying mod data", not Snapshot.equal(snap({fullType = "Base.Nails"}),
+        snap({fullType = "Base.Nails", modData = {enchanted = true}})))
+    ok("nor a part-used drainable against a full one", not Snapshot.equal(
+        snap({fullType = "Base.WaterBottle", usedDelta = 0}),
+        snap({fullType = "Base.WaterBottle", usedDelta = 0.5})))
 
-    ok("nails carrying mod data do not", Snapshot.isStackable(makeItem({
-        fullType = "Base.Nails",
-        modData = {
-            enchanted = true
-        }
-    })) == false)
-
-    ok("a favourite does not", Snapshot.isStackable(makeItem({
-        fullType = "Base.Nails",
-        favorite = true
-    })) == false)
-
-    ok("nil is not stackable", Snapshot.isStackable(nil) == false)
-    ok("and neither is a snapshot of nothing", Snapshot.isStackableSnapshot(nil) == false)
+    ok("rubbish is not equal to anything", not Snapshot.equal(nil, snap({fullType = "Base.Nails"})))
+    ok("nor is anything equal to rubbish", not Snapshot.equal(snap({fullType = "Base.Nails"}), "no"))
 end
 
-print("-- a full-condition item is still not stackable --")
+print("-- how many of a pile can go as one listing --")
 do
-    -- Tempting to treat "condition equals maximum" as interchangeable. It is
-    -- not: the buyer sees a condition bar, and two items that both happen to be
-    -- pristine today are still two items whose condition can diverge.
-    ok("a pristine hat does not stack", Snapshot.isStackable(makeItem({
-        fullType = "Base.Hat",
-        condition = 10,
-        conditionMax = 10
-    })) == false)
+    local function nails(spec)
+        spec = spec or {}
+        spec.fullType = "Base.Nails"
+        return makeItem(spec)
+    end
+
+    ok("nothing at all", Snapshot.countAlike({}) == 0)
+    ok("a single item", Snapshot.countAlike({nails()}) == 1)
+    ok("a uniform pile", Snapshot.countAlike({nails(), nails(), nails()}) == 3)
+
+    -- The odd one out is left behind rather than refusing the stack, which is
+    -- what makes ninety-eight fresh shells sellable when two are not.
+    local mixed = {nails(), nails(), nails({modData = {odd = true}}), nails()}
+    ok("counts only the ones like the first", Snapshot.countAlike(mixed) == 3)
+
+    -- Compared against the first, because the first is the one the listing
+    -- will carry the snapshot of.
+    local oddFirst = {nails({modData = {odd = true}}), nails(), nails()}
+    ok("and the first is the one that sets the standard", Snapshot.countAlike(oddFirst) == 1)
 end
 
 ---------------------------------------------------------------------------

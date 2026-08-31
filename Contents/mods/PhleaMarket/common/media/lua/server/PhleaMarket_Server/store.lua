@@ -201,43 +201,51 @@ function Store.escrow(playerObj, fullType, qty)
     qty = math.floor(tonumber(qty) or 1)
     local inv = playerObj:getInventory()
 
-    local found = {}
-    local item = inv:getFirstTypeRecurse(fullType)
-    if not item then
+    -- Every item of this type the player is carrying, so the alike ones can be
+    -- picked out of them. Recursive, because a listing may be assembled from
+    -- what is in a bag as readily as from what is in hand.
+    local held = inv:getAllEvalRecurse(function(item)
+        return item ~= nil and item.getFullType and item:getFullType() == fullType
+    end, ArrayList.new())
+
+    local candidates = {}
+    for i = 0, held:size() - 1 do
+        table.insert(candidates, held:get(i))
+    end
+    if #candidates == 0 then
         return nil, "NotHeld"
     end
-    local snapshot = Snapshot.capture(item)
+
+    local snapshot = Snapshot.capture(candidates[1])
     if not snapshot then
         return nil, "NotListable"
     end
 
-    -- Gather before removing. getItemCountRecurse counts what is there; taking
-    -- them one at a time and finding the fifth missing would leave four already
-    -- gone with no listing to show for it.
-    if qty > 1 then
-        if (inv:getItemCountRecurse(fullType) or 0) < qty then
-            return nil, "NotEnough"
+    -- Only the ones that match the snapshot the listing will hold. A stack is
+    -- faithful exactly when every item in it would have produced that same
+    -- snapshot, so a half-used lighter cannot ride along with four full ones.
+    local alike = {}
+    for _, item in ipairs(candidates) do
+        if Snapshot.equal(snapshot, Snapshot.capture(item)) then
+            table.insert(alike, item)
+            if #alike >= qty then
+                break
+            end
         end
     end
+    -- Counted before anything is removed. Taking them one at a time and finding
+    -- the fifth missing would leave four already gone with no listing to show
+    -- for it.
+    if #alike < qty then
+        return nil, "NotEnough"
+    end
 
-    for _ = 1, qty do
-        -- Not named `next`: mod code does not get the global of that name in
-        -- B42.20.4, and shadowing it invites reaching for it by habit.
-        local nextItem = inv:getFirstTypeRecurse(fullType)
-        if not nextItem then
-            -- Put back whatever was taken. Should be unreachable given the
-            -- count above, but an inventory is not ours alone and being wrong
-            -- here costs somebody their gear.
-            for _, taken in ipairs(found) do
-                inv:AddItem(taken)
-                sendAddItemToContainer(inv, taken)
-            end
-            return nil, "NotEnough"
-        end
-        local container = nextItem:getContainer() or inv
-        container:Remove(nextItem)
-        sendRemoveItemFromContainer(container, nextItem)
-        table.insert(found, nextItem)
+    local taken = {}
+    for _, item in ipairs(alike) do
+        local container = item:getContainer() or inv
+        container:Remove(item)
+        sendRemoveItemFromContainer(container, item)
+        table.insert(taken, item)
     end
 
     return snapshot

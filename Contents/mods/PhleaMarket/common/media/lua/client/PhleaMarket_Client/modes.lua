@@ -244,6 +244,7 @@ Core.registerShopMode({
 --- item that is plainly in their backpack.
 local function listableInventory(player)
     local rows, order = {}, {}
+    local byType = {}
     local items = player:getInventory():getAllEvalRecurse(function()
         return true
     end, ArrayList.new())
@@ -251,20 +252,31 @@ local function listableInventory(player)
         local item = items:get(i)
         local fullType = item.getFullType and item:getFullType()
         if fullType and Market.isListable(fullType) then
-            local row = rows[fullType]
-            if not row then
-                row = {
-                    fullType = fullType,
-                    itemName = item:getName(),
-                    count = 0,
-                    stackable = Snapshot.isStackable(item)
-                }
-                rows[fullType] = row
+            if not byType[fullType] then
+                byType[fullType] = {}
                 table.insert(order, fullType)
+                rows[fullType] = {
+                    fullType = fullType,
+                    itemName = item:getName()
+                }
             end
-            row.count = row.count + 1
+            table.insert(byType[fullType], item)
         end
     end
+
+    -- The count offered is how many are alike, not how many are held.
+    --
+    -- A listing carries one snapshot, so a stack is only honest while every
+    -- item in it would have produced that same snapshot. Ninety-eight fresh
+    -- shells and two that differ is a stack of ninety-eight, and the server
+    -- picks the same ones by the same rule when it takes them.
+    for fullType, list in pairs(byType) do
+        local alike = Snapshot.countAlike(list)
+        rows[fullType].count = alike
+        rows[fullType].held = #list
+        rows[fullType].stackable = alike > 1
+    end
+
     return rows, order
 end
 

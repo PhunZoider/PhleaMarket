@@ -89,15 +89,12 @@ Commands[C.list] = function(playerObj, args)
         })
     end
 
-    -- Quantity is only offered for items where every one is interchangeable,
-    -- because a snapshot holds one exemplar: fifty axes listed as a stack would
-    -- come back as fifty copies of whichever one was captured.
+    -- Held at all? Whether enough of them are alike enough to travel as one
+    -- listing is escrow's question, since it is the one picking which items to
+    -- take and by the same rule.
     local held = playerObj:getInventory():getFirstTypeRecurse(fullType)
     if not held then
         return fail(playerObj, "NotHeld")
-    end
-    if qty > 1 and not Snapshot.isStackable(held) then
-        return fail(playerObj, "NotStackable")
     end
 
     local snapshot, why = Store.escrow(playerObj, fullType, qty)
