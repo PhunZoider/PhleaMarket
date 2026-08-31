@@ -97,6 +97,23 @@ end
 ---
 --- Read from the script rather than sent with the listing, because it is the
 --- same answer for every listing of a type and the client already has it.
+--- What to call an item type on screen.
+---
+--- Asked of the script rather than taken from the listing. A listing carries
+--- the name the item had when it was listed, which can be absent on anything
+--- made before that field existed, and the heading then read "Base.ShotgunShells"
+--- while the tile beside it said "12g Round". The script is the same answer the
+--- grid uses, so the two cannot disagree.
+local function displayNameOf(fullType)
+    local manager = getScriptManager()
+    local script = manager and manager:getItem(fullType)
+    local name = script and script:getDisplayName()
+    if name and name ~= "" then
+        return name
+    end
+    return fullType
+end
+
 local function categoryOf(fullType)
     local manager = getScriptManager()
     local script = manager and manager:getItem(fullType)
@@ -208,16 +225,26 @@ Core.registerShopMode({
 
             -- The spread, said here because the grid draws one price per tile
             -- and a range is two. This is the first place it can be told.
+            --
+            -- "from" only when there is a spread to speak of. Two listings at
+            -- the same price are not a range, and saying "$1.00 to $1.00" makes
+            -- a reader look twice at nothing.
             local guide = Client.data.group and Client.data.group.guide
             local rows = Client.data.group and Client.data.group.rows
-            local text = (Client.data.group and Client.data.group.itemName) or fullType
+            local text = displayNameOf(fullType)
             if guide then
-                text = getText("IGUI_PhleaMarket_GroupHeading", text,
-                    Market.formatAmount("change", guide.low), Market.formatAmount("change", guide.high),
-                    tostring(#(rows or {})))
+                local key = guide.low == guide.high and "IGUI_PhleaMarket_GroupHeadingFlat" or
+                                "IGUI_PhleaMarket_GroupHeading"
+                text = getText(key, text, Market.formatAmount("change", guide.low), tostring(#(rows or {})))
             end
-            local label = ISLabel:new(x + backW + math.floor(8 * FS), y, h, text, 0.85, 0.85, 0.85, 1, UIFont.Small,
-                true)
+
+            -- Cut to what is left of the strip. A label draws its whole string
+            -- whatever it is given, so a long item name ran off the end and over
+            -- the machine beside it.
+            local labelX = x + backW + math.floor(8 * FS)
+            text = tools.truncate(text, (x + w) - labelX, UIFont.Small)
+
+            local label = ISLabel:new(labelX, y, h, text, 0.85, 0.85, 0.85, 1, UIFont.Small, true)
             label:initialise()
 
             return {back, label}
@@ -634,6 +661,16 @@ Events[Market.events.OnData].Add(function(kind, payload)
         -- so ask again rather than working out which.
         Client.send(C.browse)
         Client.send(C.mine)
+        -- Including the open group. Without this the listing just bought stayed
+        -- on screen, and buying it again asked the server for something that had
+        -- already gone -- which answered, correctly and uselessly, that somebody
+        -- got there first. That somebody was you, a moment ago.
+        local openType = window._phleaGroup
+        if openType then
+            Client.send(C.group, {
+                fullType = openType
+            })
+        end
     end
     -- A group reply changes the heading as well as the grid: the spread and
     -- the count are only known once the listings arrive.
