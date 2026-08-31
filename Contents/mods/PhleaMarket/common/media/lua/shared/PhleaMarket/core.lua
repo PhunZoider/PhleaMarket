@@ -11,7 +11,6 @@
 -- which is why it declares require=phunmart2 and does almost nothing on its
 -- own.
 -- =========================================================
-
 if not PhunMart then
     -- require=phunmart2 in mod.info should make this impossible. It is checked
     -- anyway because the failure is otherwise a nil index somewhere further
@@ -159,7 +158,6 @@ function Market.formatAmount(pool, amount)
     amount = tonumber(amount) or 0
     local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
     if def and def.format == "cents" then
-        local tools = Core.ui and Core.ui.client
         -- The shared formatter lives in a client-only module, so this does the
         -- same arithmetic rather than reaching across for it.
         local sign = amount < 0 and "-" or ""
