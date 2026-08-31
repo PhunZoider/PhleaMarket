@@ -5,6 +5,9 @@
   "IGUI_PhleaMarket_Mode_Returns": "Returns",
 
   "IGUI_PhleaMarket_BuyBack": "Buy back",
+  "IGUI_PhleaMarket_View": "View",
+  "IGUI_PhleaMarket_Back": "< Back",
+  "IGUI_PhleaMarket_GroupHeading": "%1 - %2 to %3 each, %4 listings",
   "IGUI_PhleaMarket_AllCategories": "Everything",
   "IGUI_PhleaMarket_SearchHint": "Search by item name. Start with @ to search by seller instead.",
   "IGUI_PhleaMarket_List": "List",

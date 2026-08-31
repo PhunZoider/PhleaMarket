@@ -16,6 +16,7 @@ end
 -- changing to show listings instead of stock.
 
 require "ISUI/ISComboBox"
+require "ISUI/ISLabel"
 require "ISUI/ISTextEntryBox"
 require "PhleaMarket/core"
 require "PhleaMarket/commands"
@@ -134,6 +135,43 @@ local function matches(ui, row)
     return ((row.itemName or "") .. " " .. (row.fullType or "")):lower():find(search, 1, true) ~= nil
 end
 
+--- Which item type the player has opened, or nil while looking at all of them.
+---
+--- Browsing a market is two questions, and answering them on one screen is what
+--- made a busy market unreadable: what is for sale at all, and then who is
+--- selling this particular thing and for how much. So the grid shows one tile
+--- per item type, and opening one shows the listings underneath it.
+local function groupOf(ui)
+    return ui._phleaGroup
+end
+
+local function openGroup(ui, fullType)
+    ui._phleaGroup = fullType
+    Client.data.group = nil
+    Modes.window = ui
+    Client.send(C.group, {
+        fullType = fullType
+    })
+    ui:buildModeFilter()
+    ui:refreshGrid()
+end
+
+local function closeGroup(ui)
+    ui._phleaGroup = nil
+    ui:buildModeFilter()
+    ui:refreshGrid()
+end
+
+--- Searching by seller answers a question about listings, not about item types,
+--- so it drops out of the grouped view and shows the listings directly. A
+--- summary carries no seller to match against, and inventing one would be
+--- pretending the grouping knows something it does not.
+local function isSellerSearch(ui)
+    local state = ui._phleaFilter
+    local search = state and state.search
+    return type(search) == "string" and search:sub(1, 1) == "@" and #search > 1
+end
+
 Core.registerShopMode({
     key = "market",
     label = "IGUI_PhleaMarket_Mode_Buy",
@@ -141,16 +179,49 @@ Core.registerShopMode({
     flag = "consignment",
 
     onEnter = function(ui)
+        ui._phleaGroup = nil
         refresh(ui, C.browse)
     end,
 
-    --- A category dropdown and a search box, along the strip the window lends
-    --- a mode. Both filter what is already here rather than asking again: a
-    --- search that goes to the server on every keystroke is unusable at any
-    --- latency, and the whole active market arrives in one browse anyway.
+    onExit = function(ui)
+        ui._phleaGroup = nil
+    end,
+
+    --- The strip changes with the view. Browsing types, it narrows them: a
+    --- category dropdown and a search box, both filtering what is already here
+    --- rather than asking again, because a search that round-trips on every
+    --- keystroke is unusable at any latency. Inside a type, it says which one
+    --- and offers the way back.
     createFilter = function(ui, x, y, w, h)
         ui._phleaFilter = ui._phleaFilter or {}
         local state = ui._phleaFilter
+
+        local fullType = groupOf(ui)
+        if fullType then
+            local backW = math.floor(70 * FS)
+            local back = ISButton:new(x, y, backW, h, getText("IGUI_PhleaMarket_Back"), ui, function(target)
+                closeGroup(target)
+            end)
+            back:initialise()
+            back:instantiate()
+            back.font = UIFont.Small
+
+            -- The spread, said here because the grid draws one price per tile
+            -- and a range is two. This is the first place it can be told.
+            local guide = Client.data.group and Client.data.group.guide
+            local rows = Client.data.group and Client.data.group.rows
+            local text = (Client.data.group and Client.data.group.itemName) or fullType
+            if guide then
+                text = getText("IGUI_PhleaMarket_GroupHeading", text,
+                    Market.formatAmount("change", guide.low), Market.formatAmount("change", guide.high),
+                    tostring(#(rows or {})))
+            end
+            local label = ISLabel:new(x + backW + math.floor(8 * FS), y, h, text, 0.85, 0.85, 0.85, 1, UIFont.Small,
+                true)
+            label:initialise()
+
+            return {back, label}
+        end
 
         local comboW = math.floor(w * 0.42)
         local combo = ISComboBox:new(x, y, comboW, h, ui, function(target, box)
@@ -179,23 +250,50 @@ Core.registerShopMode({
 
     getGridData = function(ui)
         local browse = Client.data.browse
-        if not (browse and browse.listings) then
+        if not browse then
             return emptyGrid(ui)
         end
-        -- Rebuilt from what arrived, so a category that no longer has anything
-        -- listed stops being offered rather than becoming a filter that empties
-        -- the grid.
-        Modes.fillCategories(ui._phleaCombo, ui._phleaFilter and ui._phleaFilter.category, browse.listings)
+
+        local fullType = groupOf(ui)
         local offers = {}
-        for _, row in ipairs(browse.listings) do
+
+        if fullType then
+            -- The listings under one type, as the server ordered them: cheapest
+            -- first, then oldest first.
+            for _, row in ipairs((Client.data.group and Client.data.group.rows) or {}) do
+                offers[row.id] = asOffer(row.id, fullType, row.unit, row.pool, row.qty)
+            end
+            return gridOf(ui, offers)
+        end
+
+        Modes.fillCategories(ui._phleaCombo, ui._phleaFilter and ui._phleaFilter.category, browse.listings)
+
+        -- Looking for a seller is a question about listings, so it answers with
+        -- listings rather than with the types they happen to be.
+        if isSellerSearch(ui) then
+            for _, row in ipairs(browse.listings or {}) do
+                if matches(ui, row) then
+                    offers[row.id] = asOffer(row.id, row.fullType, row.unit, row.pool, row.qty)
+                end
+            end
+            return gridOf(ui, offers)
+        end
+
+        -- One tile per item type: the lowest anybody is asking, and how many
+        -- are to be had across every listing of it.
+        for _, row in ipairs(browse.rows or {}) do
             if matches(ui, row) then
-                offers[row.id] = asOffer(row.id, row.fullType, row.unit, row.pool, row.qty)
+                offers["type:" .. row.fullType] = asOffer("type:" .. row.fullType, row.fullType, row.low, "change",
+                    row.available)
             end
         end
         return gridOf(ui, offers)
     end,
 
     actionLabel = function(ui, offer)
+        if not groupOf(ui) and not isSellerSearch(ui) then
+            return getText("IGUI_PhleaMarket_View")
+        end
         -- Buying your own listing is allowed -- it is a strictly worse Cancel,
         -- since you pay commission to get your own item back -- but it should
         -- not look like a mistake, so it says what it is.
@@ -210,6 +308,11 @@ Core.registerShopMode({
         if not id then
             return false
         end
+        -- Opening a type asks nothing of the wallet. Even a market of listings
+        -- nobody can afford is worth being able to look at.
+        if not groupOf(ui) and not isSellerSearch(ui) then
+            return true
+        end
         local price = offer and offer.price
         if not price then
             return false
@@ -219,6 +322,16 @@ Core.registerShopMode({
 
     onAction = function(ui)
         if not ui.selectedId then
+            return
+        end
+        if not groupOf(ui) and not isSellerSearch(ui) then
+            -- Opened even when there is only one listing under it. That page is
+            -- then a confirmation: who is selling, what condition it is in and
+            -- what they want, before any money moves.
+            local fullType = tostring(ui.selectedId):match("^type:(.+)$")
+            if fullType then
+                openGroup(ui, fullType)
+            end
             return
         end
         Client.send(C.buy, {
@@ -482,6 +595,14 @@ function Modes.rowFor(ui, offer)
     if not (offer and ui and ui.selectedId) then
         return nil
     end
+    -- The open group first: inside one, that is where the selected listing is,
+    -- and the browse reply does not necessarily still hold it.
+    local group = Client.data.group
+    for _, row in ipairs(group and group.rows or {}) do
+        if row.id == ui.selectedId then
+            return row
+        end
+    end
     local browse = Client.data.browse
     for _, row in ipairs(browse and browse.listings or {}) do
         if row.id == ui.selectedId then
@@ -513,6 +634,11 @@ Events[Market.events.OnData].Add(function(kind, payload)
         -- so ask again rather than working out which.
         Client.send(C.browse)
         Client.send(C.mine)
+    end
+    -- A group reply changes the heading as well as the grid: the spread and
+    -- the count are only known once the listings arrive.
+    if kind == "group" and window.buildModeFilter then
+        window:buildModeFilter()
     end
     if window.refreshGrid then
         window:refreshGrid()

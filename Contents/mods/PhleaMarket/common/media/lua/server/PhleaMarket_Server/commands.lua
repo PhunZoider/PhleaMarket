@@ -517,8 +517,12 @@ Commands[C.group] = function(playerObj, args)
             conditionMax = listing.snapshot and listing.snapshot.conditionMax
         })
     end
+    -- The name travels with it: the heading needs one before any tile has been
+    -- drawn, and the client would otherwise have only the type.
+    local itemName = rows[1] and rows[1].itemName or args.fullType
     Store.respond(playerObj, C.groupData, {
         fullType = args.fullType,
+        itemName = itemName,
         rows = rows,
         guide = Listings.priceGuide(store, args.fullType)
     })
