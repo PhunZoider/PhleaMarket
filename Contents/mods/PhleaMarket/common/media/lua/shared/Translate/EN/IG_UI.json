@@ -19,7 +19,8 @@
   "IGUI_PhleaMarket_Quantity": "How many (of %1)",
   "IGUI_PhleaMarket_Duration": "How long",
   "IGUI_PhleaMarket_AskingTotal": "Asking %1",
-  "IGUI_PhleaMarket_FeeNow": "Costs %1 to list",
+  "IGUI_PhleaMarket_FeeNow": "Costs %1 to list, not refunded",
+  "IGUI_PhleaMarket_FeeFree": "Free to list",
   "IGUI_PhleaMarket_YouGet": "You get %1 if it all sells",
 
   "IGUI_PhleaMarket_Msg_Listed": "Listed.",

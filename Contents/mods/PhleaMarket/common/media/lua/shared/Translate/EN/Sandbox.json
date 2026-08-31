@@ -34,6 +34,9 @@
   "Sandbox_PhleaMarket_ListingFeeFixed": "Listing fee, fixed",
   "Sandbox_PhleaMarket_ListingFeeFixed_tooltip": "Flat amount charged when a listing goes up, before the duration multiplier. Only used when the listing fee is set to a fixed amount.",
 
+  "Sandbox_PhleaMarket_ListingFeeMin": "Listing fee, minimum",
+  "Sandbox_PhleaMarket_ListingFeeMin_tooltip": "The least a listing may cost to put up, whatever the percentage works out to. A percentage of a very cheap listing rounds down to nothing, so without a floor the cheapest listings are free and the fee stops discouraging spam exactly where spam is cheapest. Zero leaves it off.",
+
   "Sandbox_PhleaMarket_CommissionMode": "Commission",
   "Sandbox_PhleaMarket_CommissionMode_tooltip": "Whether the house takes a share of each sale or a flat cut. This is the main currency sink in the market.",
 

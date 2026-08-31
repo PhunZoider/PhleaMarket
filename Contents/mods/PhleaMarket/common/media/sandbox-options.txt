@@ -96,6 +96,16 @@ option PhleaMarket.ListingFeeFixed
     translation = PhleaMarket_ListingFeeFixed,
 }
 
+option PhleaMarket.ListingFeeMin
+{
+    type = integer,
+    default = 0,
+    min = 0,
+    max = 100000,
+    page = PhleaMarket,
+    translation = PhleaMarket_ListingFeeMin,
+}
+
 option PhleaMarket.CommissionMode
 {
     type = enum,

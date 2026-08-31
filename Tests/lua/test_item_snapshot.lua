@@ -38,9 +38,12 @@ local KNOWN = {
     ["Base.Hat"] = true
 }
 
+-- getItem, not FindItem: getItem is the one that takes a full type, and is
+-- what the module now asks. A mock that answers a call the real engine does not
+-- is a test that passes while the game fails.
 _G.getScriptManager = function()
     return {
-        FindItem = function(_, fullType)
+        getItem = function(_, fullType)
             return KNOWN[fullType] and {
                 type = fullType
             } or nil
@@ -179,7 +182,7 @@ local function makeItem(spec)
     return item
 end
 
--- What CreateItem hands back: a blank item of that type, with every method a
+-- What instanceItem hands back: a blank item of that type, with every method a
 -- real one has, so restore can set whatever it wants. Blank on purpose --
 -- a test that starts from a populated item proves nothing about restore.
 local CREATE_SHAPE = {
@@ -199,22 +202,21 @@ local CREATE_SHAPE = {
     }
 }
 
-_G.InventoryItemFactory = {
-    CreateItem = function(fullType)
-        if not KNOWN[fullType] then
-            return nil
-        end
-        local shape = {}
-        for k, v in pairs(CREATE_SHAPE[fullType] or {}) do
-            shape[k] = v
-        end
-        shape.fullType = fullType
-        if shape.conditionMax then
-            shape.condition = shape.conditionMax
-        end
-        return makeItem(shape)
+-- instanceItem is the global the game actually exposes for this.
+_G.instanceItem = function(fullType)
+    if not KNOWN[fullType] then
+        return nil
     end
-}
+    local shape = {}
+    for k, v in pairs(CREATE_SHAPE[fullType] or {}) do
+        shape[k] = v
+    end
+    shape.fullType = fullType
+    if shape.conditionMax then
+        shape.condition = shape.conditionMax
+    end
+    return makeItem(shape)
+end
 
 local Snapshot = require "PhleaMarket/item_snapshot"
 
@@ -412,6 +414,32 @@ do
     }
     ok("restore returns nothing rather than erroring", Snapshot.restore(snap) == nil)
     ok("and does not throw", pcall(Snapshot.restore, snap))
+end
+
+print("-- the global that builds an item is not there --")
+do
+    -- This is the shape of the bug that shipped. restore called
+    -- InventoryItemFactory.CreateItem, which is not a global in B42 at all --
+    -- it appears in the game's own Lua exactly once, commented out -- so the
+    -- guard around it refused every restore and every buy and collect failed
+    -- with "that item no longer exists in this game".
+    --
+    -- The mock said otherwise, so the tests were green while the game was not.
+    -- What can honestly be checked here is that a missing builder is refused
+    -- rather than thrown, which is the path that ran for real.
+    local real = _G.instanceItem
+    _G.instanceItem = nil
+    local okCall, result = pcall(Snapshot.restore, {
+        v = 1,
+        fullType = "Base.Axe"
+    })
+    _G.instanceItem = real
+    ok("refuses rather than throwing", okCall, tostring(result))
+    ok("and returns nothing", okCall and result == nil)
+    ok("and works again once it is back", Snapshot.restore({
+        v = 1,
+        fullType = "Base.Axe"
+    }) ~= nil)
 end
 
 print("-- rubbish in --")

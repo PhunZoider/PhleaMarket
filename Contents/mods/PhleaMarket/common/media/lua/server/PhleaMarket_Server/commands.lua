@@ -62,7 +62,7 @@ Commands[C.list] = function(playerObj, args)
 
     local qty = math.floor(tonumber(args.qty) or 1)
     local price = math.floor(tonumber(args.unitPrice) or 0)
-    local hours, mult = Store.duration(args.duration)
+    local hours = Store.duration(args.duration)
     local limits = Store.limits()
 
     -- Check the limit before taking anything out of the seller's bag. Refusing
@@ -81,7 +81,7 @@ Commands[C.list] = function(playerObj, args)
     -- The fee is worked out on what is being asked, so the seller has already
     -- been shown this number and agreed to it.
     local askingTotal = price * qty
-    local fee = Listings.applyFee(Store.listingFeeRule(), askingTotal) * mult
+    local fee = Market.listingFeeFor(askingTotal, args.duration)
     local pool = Store.feePool()
     if fee > 0 and (Core.wallet:getBalance(playerObj, pool) or 0) < fee then
         return fail(playerObj, "CannotAffordFee", {
@@ -340,14 +340,14 @@ Commands[C.relist] = function(playerObj, args)
         return fail(playerObj, "NotFound")
     end
 
-    local hours, mult = Store.duration(args.duration)
+    local hours = Store.duration(args.duration)
     local price = math.floor(tonumber(args.unitPrice) or (entry.unitPrice and entry.unitPrice.amount) or 0)
     local limits = Store.limits()
     if price < limits.minPrice or price > limits.maxPrice then
         return fail(playerObj, "BadPrice")
     end
 
-    local fee = Listings.applyFee(Store.listingFeeRule(), price * entry.qty) * mult
+    local fee = Market.listingFeeFor(price * entry.qty, args.duration)
     local pool = Store.feePool()
     if fee > 0 and (Core.wallet:getBalance(playerObj, pool) or 0) < fee then
         return fail(playerObj, "CannotAffordFee", {

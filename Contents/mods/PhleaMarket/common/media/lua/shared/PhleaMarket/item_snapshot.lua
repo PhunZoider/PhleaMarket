@@ -258,20 +258,31 @@ function Snapshot.restore(snap)
         return nil
     end
 
-    -- Ask before building. CreateItem on a type the script manager has never
-    -- heard of is not a question worth putting to the engine.
+    -- Ask before building. Making an item of a type the script manager has
+    -- never heard of is not a question worth putting to the engine.
+    --
+    -- getItem rather than FindItem: getItem is what takes a full type, and is
+    -- what PhunMart uses everywhere it resolves one.
     local manager = type(getScriptManager) == "function" and getScriptManager()
-    if manager and type(manager.FindItem) == "function" then
-        local ok, script = pcall(manager.FindItem, manager, snap.fullType)
+    if manager and type(manager.getItem) == "function" then
+        local ok, script = pcall(manager.getItem, manager, snap.fullType)
         if not ok or not script then
             return nil
         end
     end
 
-    if type(InventoryItemFactory) ~= "table" or type(InventoryItemFactory.CreateItem) ~= "function" then
+    -- instanceItem is the global that builds a detached InventoryItem, and is
+    -- what both the game and PhunMart's item grid use.
+    --
+    -- This was InventoryItemFactory.CreateItem, which is in the game's Lua
+    -- exactly once and commented out. It is not a global at all, so the guard
+    -- around it refused every restore, and every buy and every collect failed
+    -- with "that item no longer exists in this game" while the listing sat
+    -- untouched. Checking a name against a comment is not checking it.
+    if type(instanceItem) ~= "function" then
         return nil
     end
-    local created, item = pcall(InventoryItemFactory.CreateItem, snap.fullType)
+    local created, item = pcall(instanceItem, snap.fullType)
     if not created or not item then
         return nil
     end

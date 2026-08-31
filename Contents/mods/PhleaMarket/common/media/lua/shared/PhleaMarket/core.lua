@@ -149,6 +149,60 @@ function Market.feePool()
     return Market.getOption("FeePool", "change")
 end
 
+--- An amount in the words of the pool it belongs to.
+---
+--- A price is a number of pool units, and what a unit is depends on the pool:
+--- change is counted in cents and reads as $0.05, tokens are counted in tokens
+--- and read as 5. Showing the raw number leaves a seller typing 5 and having no
+--- idea whether they have asked for a nickel or five dollars.
+function Market.formatAmount(pool, amount)
+    amount = tonumber(amount) or 0
+    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
+    if def and def.format == "cents" then
+        local tools = Core.ui and Core.ui.client
+        -- The shared formatter lives in a client-only module, so this does the
+        -- same arithmetic rather than reaching across for it.
+        local sign = amount < 0 and "-" or ""
+        local n = math.abs(math.floor(amount))
+        return string.format("%s$%d.%02d", sign, math.floor(n / 100), n % 100)
+    end
+    return tostring(math.floor(amount))
+end
+
+--- What listing something actually costs, all in.
+---
+--- One function rather than the percentage, the multiplier and the floor spelt
+--- out at each of the three call sites -- the dialog that shows the figure, the
+--- command that charges it, and the relist that does both.
+---
+--- The floor exists because a percentage of a small asking price rounds to
+--- nothing: two percent of a nickel is zero, so cheap listings were free and
+--- the fee stopped being a brake on spam exactly where spam is cheapest. It
+--- only applies when the rule would charge something at all, so setting the
+--- percentage to zero still means free listings.
+function Market.listingFeeFor(askingTotal, duration)
+    local Listings = require "PhleaMarket/listings"
+    local rule = Market.listingFeeRule()
+    local _, mult = Market.duration(duration)
+
+    local charges = (tonumber(rule.percent) or 0) > 0 or (tonumber(rule.fixed) or 0) > 0
+    if not charges then
+        return 0
+    end
+
+    local fee = Listings.applyFee(rule, askingTotal) * mult
+    local floor = Market.getOption("ListingFeeMin", 0)
+    if floor > 0 and fee < floor then
+        fee = floor
+    end
+    -- Never more than the seller is asking, or listing would cost more than
+    -- selling could return.
+    if fee > askingTotal then
+        fee = askingTotal
+    end
+    return math.floor(fee)
+end
+
 function Market.debugLn(str)
     if Core.settings and Core.settings.Debug then
         print("[PhleaMarket] " .. tostring(str))

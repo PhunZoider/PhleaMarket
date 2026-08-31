@@ -65,7 +65,7 @@ function UI.successText(payload)
     payload = payload or {}
     if payload.action == "list" or payload.action == "relist" then
         if (payload.fee or 0) > 0 then
-            return getText("IGUI_PhleaMarket_Msg_ListedWithFee", tools.formatCents(payload.fee))
+            return getText("IGUI_PhleaMarket_Msg_ListedWithFee", Market.formatAmount("change", payload.fee))
         end
         return getText("IGUI_PhleaMarket_Msg_Listed")
     elseif payload.action == "buy" then
@@ -79,7 +79,7 @@ function UI.successText(payload)
         -- that leaves money behind because the wallet is full otherwise looks
         -- like a collect that did nothing.
         if (payload.stillHeld or 0) > 0 then
-            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", tools.formatCents(payload.stillHeld))
+            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount("change", payload.stillHeld))
         end
         if (payload.keptBack or 0) > 0 then
             return getText("IGUI_PhleaMarket_Msg_CollectedNoRoom")
@@ -255,20 +255,28 @@ function Dialog:render()
     -- drift apart.
     local price, qty = self:values()
     local total = price * qty
-    local _, mult = Market.duration(self.duration)
-    local fee = Listings.applyFee(Market.listingFeeRule(), total) * mult
+    local fee = Market.listingFeeFor(total, self.duration)
     local commission = Listings.applyFee(Market.commissionRule(), total)
+    local pool = "change"
+
+    -- Beside the box, because a seller typing 5 has no way to know whether they
+    -- have asked for a nickel or five dollars until they see it written out.
+    self:drawText(Market.formatAmount(pool, price), self.priceBox:getX() - math.floor(64 * FS),
+        priceY + math.floor(4 * FS), 0.6, 0.85, 0.6, 1, UIFont.Small)
 
     local y = self.feeY
-    self:drawText(getText("IGUI_PhleaMarket_AskingTotal", tools.formatCents(total)), pad, y, 0.85, 0.85, 0.85, 1,
-        UIFont.Small)
+    self:drawText(getText("IGUI_PhleaMarket_AskingTotal", Market.formatAmount(pool, total)), pad, y, 0.85, 0.85,
+        0.85, 1, UIFont.Small)
     y = y + FONT_SM + math.floor(2 * FS)
-    self:drawText(getText("IGUI_PhleaMarket_FeeNow", tools.formatCents(fee)), pad, y, 0.9, 0.75, 0.4, 1, UIFont.Small)
+    -- Named as non-refundable, because it is: cancelling a listing returns the
+    -- goods and not the fee, and that is better learned before paying it.
+    local feeKey = fee > 0 and "IGUI_PhleaMarket_FeeNow" or "IGUI_PhleaMarket_FeeFree"
+    self:drawText(getText(feeKey, Market.formatAmount(pool, fee)), pad, y, 0.9, 0.75, 0.4, 1, UIFont.Small)
     y = y + FONT_SM + math.floor(2 * FS)
     -- Take-home, not the asking price. The number a seller actually cares about
     -- is what lands in their wallet if it all sells.
-    self:drawText(getText("IGUI_PhleaMarket_YouGet", tools.formatCents(total - commission)), pad, y, 0.5, 0.9, 0.5, 1,
-        UIFont.Small)
+    self:drawText(getText("IGUI_PhleaMarket_YouGet", Market.formatAmount(pool, total - commission)), pad, y, 0.5,
+        0.9, 0.5, 1, UIFont.Small)
 end
 
 function Dialog:onOK()
