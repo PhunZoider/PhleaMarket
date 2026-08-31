@@ -228,16 +228,32 @@ Commands[C.buy] = function(playerObj, args)
                 Store.now())
         end
 
-        -- Left for the seller to find. A sale is the one thing that happens to
-        -- somebody while they are not there, and until now the only way to
-        -- learn of it was to open Mine and notice something missing.
-        Listings.addNotice(store, sale.seller, {
-            itemName = sale.itemName or sale.fullType,
-            qty = sale.qty,
-            net = sale.net,
-            held = held,
-            at = Store.now()
-        })
+        -- Told now if they are here, left for them if they are not.
+        --
+        -- Something selling is good news and good news is better immediately:
+        -- a seller standing at a machine watching their axe go should see it
+        -- happen rather than find out at their next login. The queue is for
+        -- everyone else.
+        --
+        -- Not for buying your own listing. They know.
+        if not sale.selfPurchase then
+            local notice = {
+                itemName = sale.itemName or sale.fullType,
+                qty = sale.qty,
+                net = sale.net,
+                held = held,
+                at = Store.now()
+            }
+            local seller = Core.utils.getPlayerByUsername(sale.seller, true)
+            if seller then
+                Store.respond(seller, C.noticesData, {
+                    notices = {notice},
+                    missed = 0
+                })
+            else
+                Listings.addNotice(store, sale.seller, notice)
+            end
+        end
     end
 
     Store.log({
