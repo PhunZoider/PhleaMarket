@@ -60,6 +60,10 @@ handlers[C.groupData] = function(payload)
     triggerEvent(Market.events.OnData, "group", payload)
 end
 
+handlers[C.noticesData] = function(payload)
+    triggerEvent(Market.events.OnData, "notices", payload)
+end
+
 handlers[C.priceInfoData] = function(payload)
     Client.data.priceInfo = payload
     triggerEvent(Market.events.OnData, "priceInfo", payload)
@@ -99,5 +103,22 @@ end)
 Events[Market.events.OnResult].Add(function(command, payload)
     dispatch(command, payload)
 end)
+
+---------------------------------------------------------------------------
+-- Catching up
+---------------------------------------------------------------------------
+
+--- Ask what happened while this account was away, once, after the world is up.
+---
+--- On a tick rather than on a connect event, and asked for by the client rather
+--- than pushed by the server, for the reason PhunMart does the same with
+--- playerSetup: the client is the only side that knows when it is ready to be
+--- told, and singleplayer and multiplayer then take one path instead of two.
+local function catchUp()
+    Events.OnTick.Remove(catchUp)
+    Client.send(C.catchUp)
+end
+
+Events.OnTick.Add(catchUp)
 
 return Client

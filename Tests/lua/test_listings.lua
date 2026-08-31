@@ -591,6 +591,51 @@ do
     ok("a cap of zero turns it off", #store.log == 0)
 end
 
+print("-- telling a seller what happened while they were out --")
+do
+    local store = L.newStore()
+    ok("nothing waiting", select(1, L.takeNotices(store, "steve")) and #select(1, L.takeNotices(store, "steve")) == 0)
+
+    L.addNotice(store, "steve", {
+        itemName = "Axe",
+        qty = 1,
+        net = 285
+    })
+    L.addNotice(store, "steve", {
+        itemName = "Nails",
+        qty = 12,
+        net = 114
+    })
+
+    local items, missed = L.takeNotices(store, "steve")
+    ok("both are waiting", #items == 2)
+    ok("oldest first, so a summary reads in order", items[1].itemName == "Axe")
+    ok("nothing was dropped", missed == 0)
+
+    -- Shown once. A notice shown twice is worse than one shown late.
+    local again = L.takeNotices(store, "steve")
+    ok("taken means gone", #again == 0)
+    ok("and nobody else's", #select(1, L.takeNotices(store, "dave")) == 0)
+end
+
+print("-- a seller away a long time --")
+do
+    local store = L.newStore()
+    for i = 1, L.MAX_NOTICES + 5 do
+        L.addNotice(store, "steve", {
+            itemName = "Item" .. i,
+            qty = 1,
+            net = i
+        })
+    end
+    local items, missed = L.takeNotices(store, "steve")
+    ok("keeps only the cap", #items == L.MAX_NOTICES)
+    -- The oldest go, not the newest: somebody back after a month wants to hear
+    -- about this week.
+    ok("and keeps the newest of them", items[#items].itemName == "Item" .. (L.MAX_NOTICES + 5))
+    ok("counting what fell off", missed == 5)
+end
+
 print("-- what to ask for it --")
 do
     local store = L.newStore()

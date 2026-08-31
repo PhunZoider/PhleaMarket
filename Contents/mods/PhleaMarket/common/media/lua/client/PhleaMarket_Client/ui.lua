@@ -90,6 +90,61 @@ function UI.successText(payload)
 end
 
 ---------------------------------------------------------------------------
+-- What happened while you were away
+---------------------------------------------------------------------------
+
+--- Tell somebody what sold, once, when they arrive.
+---
+--- One toast rather than one per sale. A player back after a week does not want
+--- eleven notifications queued behind each other, and the thing they actually
+--- want to know -- that money is waiting and roughly how much -- fits in a line.
+--- The detail is in Mine and Returns, which is where they are going next.
+local function showNotices(payload)
+    local notices = payload and payload.notices or {}
+    if #notices == 0 then
+        return
+    end
+
+    local total, items = 0, 0
+    for _, notice in ipairs(notices) do
+        total = total + (notice.net or 0)
+        items = items + (notice.qty or 1)
+    end
+    local missed = payload.missed or 0
+
+    local text
+    if #notices == 1 and missed == 0 then
+        local one = notices[1]
+        text = getText("IGUI_PhleaMarket_SoldOne", tostring(one.qty or 1), tostring(one.itemName or "?"),
+            Market.formatAmount("change", one.net or 0))
+    else
+        text = getText("IGUI_PhleaMarket_SoldMany", tostring(#notices + missed), tostring(items),
+            Market.formatAmount("change", total))
+    end
+
+    local toast = Core.ui and Core.ui.toast
+    if toast and toast.show then
+        toast.show({
+            text = text,
+            duration = 6,
+            color = {0.4, 0.9, 0.5}
+        })
+    else
+        -- No toast to show it in is not a reason to swallow it.
+        local player = getPlayer()
+        if player then
+            player:Say(text)
+        end
+    end
+end
+
+Events[Market.events.OnData].Add(function(kind, payload)
+    if kind == "notices" then
+        showNotices(payload)
+    end
+end)
+
+---------------------------------------------------------------------------
 -- Naming a price
 ---------------------------------------------------------------------------
 

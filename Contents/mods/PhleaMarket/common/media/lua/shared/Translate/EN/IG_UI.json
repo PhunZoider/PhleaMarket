@@ -41,6 +41,8 @@
   "IGUI_PhleaMarket_Msg_CollectedPartial": "Collected. %1 is waiting until your wallet has room.",
   "IGUI_PhleaMarket_Msg_CollectedNoRoom": "Collected what would fit. The rest is still here.",
   "IGUI_PhleaMarket_Msg_Done": "Done.",
+  "IGUI_PhleaMarket_SoldOne": "Phlea Market: %1 x %2 sold for %3",
+  "IGUI_PhleaMarket_SoldMany": "Phlea Market: %1 sales while you were away, %2 items for %3",
 
   "IGUI_PhleaMarket_Err_Disabled": "The market is closed.",
   "IGUI_PhleaMarket_Err_NoItem": "Nothing selected.",

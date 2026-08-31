@@ -698,6 +698,51 @@ function Listings.priceGuide(store, fullType)
 end
 
 ---------------------------------------------------------------------------
+-- Telling a seller what happened while they were out
+---------------------------------------------------------------------------
+
+--- The most recent sales a seller has not been told about yet.
+---
+--- Capped, and the cap drops the oldest rather than refusing the newest: a
+--- player away for a month wants to hear about this week, not about the first
+--- thing that sold and then nothing. `missed` counts what fell off, so the
+--- summary can say there were more than it is naming.
+Listings.MAX_NOTICES = 20
+
+function Listings.addNotice(store, username, entry)
+    if type(username) ~= "string" or username == "" or type(entry) ~= "table" then
+        return
+    end
+    store.notices = store.notices or {}
+    local mine = store.notices[username]
+    if not mine then
+        mine = {
+            items = {},
+            missed = 0
+        }
+        store.notices[username] = mine
+    end
+    table.insert(mine.items, entry)
+    while #mine.items > Listings.MAX_NOTICES do
+        table.remove(mine.items, 1)
+        mine.missed = (mine.missed or 0) + 1
+    end
+end
+
+--- Hand over what a seller has not heard, and forget it.
+---
+--- Taken rather than read, because the next thing the caller does is show it,
+--- and a notice shown twice is worse than one shown late.
+function Listings.takeNotices(store, username)
+    local mine = store.notices and store.notices[username]
+    if not mine then
+        return {}, 0
+    end
+    store.notices[username] = nil
+    return mine.items or {}, mine.missed or 0
+end
+
+---------------------------------------------------------------------------
 -- What to ask for it
 ---------------------------------------------------------------------------
 

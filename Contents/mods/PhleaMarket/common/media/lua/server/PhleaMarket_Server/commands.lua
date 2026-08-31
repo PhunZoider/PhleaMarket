@@ -227,6 +227,17 @@ Commands[C.buy] = function(playerObj, args)
             Listings.addCredit(store, sale.seller, sale.pool, held, Listings.REASON.WALLET_FULL, sale.listingId,
                 Store.now())
         end
+
+        -- Left for the seller to find. A sale is the one thing that happens to
+        -- somebody while they are not there, and until now the only way to
+        -- learn of it was to open Mine and notice something missing.
+        Listings.addNotice(store, sale.seller, {
+            itemName = sale.itemName or sale.fullType,
+            qty = sale.qty,
+            net = sale.net,
+            held = held,
+            at = Store.now()
+        })
     end
 
     Store.log({
@@ -484,6 +495,25 @@ end
 
 --- Everything worth knowing before naming a price: what the market is asking,
 --- what it has been paying, and what this account asked last time.
+--- Anything that happened while this account was away.
+---
+--- Asked for by the client once it has finished loading, rather than pushed
+--- when a player connects: the client is the only side that knows when it is
+--- ready to be told, and this way singleplayer and multiplayer take the same
+--- path.
+Commands[C.catchUp] = function(playerObj, args)
+    local store = Store.get()
+    local items, missed = Listings.takeNotices(store, nameOf(playerObj))
+    if #items == 0 then
+        return
+    end
+    Store.save()
+    Store.respond(playerObj, C.noticesData, {
+        notices = items,
+        missed = missed
+    })
+end
+
 Commands[C.priceInfo] = function(playerObj, args)
     args = args or {}
     Store.respond(playerObj, C.priceInfoData,
