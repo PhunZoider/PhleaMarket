@@ -1,0 +1,66 @@
+{
+  "Sandbox_PhleaMarket": "Phlea Market",
+
+  "Sandbox_PhleaMarket_Enabled": "Enable Phlea Market",
+  "Sandbox_PhleaMarket_Enabled_tooltip": "Turn the player market off entirely. Existing listings are left alone and become reachable again if you turn it back on.",
+
+  "Sandbox_PhleaMarket_SimulatedSellers": "Simulated sellers",
+  "Sandbox_PhleaMarket_SimulatedSellers_tooltip": "Fill the market with listings from survivors who do not exist, so it is worth visiting on a quiet server. Also what makes the machine appear in singleplayer, where there is otherwise nobody to buy from.",
+
+  "Sandbox_PhleaMarket_DurationShortHours": "Short listing, hours",
+  "Sandbox_PhleaMarket_DurationShortHours_tooltip": "How long a short listing stays up, in in-game hours. Set all three durations to the same number for a single fixed listing length.",
+
+  "Sandbox_PhleaMarket_DurationMediumHours": "Medium listing, hours",
+  "Sandbox_PhleaMarket_DurationMediumHours_tooltip": "How long a medium listing stays up, in in-game hours. This is the length offered by default when a seller lists something.",
+
+  "Sandbox_PhleaMarket_DurationLongHours": "Long listing, hours",
+  "Sandbox_PhleaMarket_DurationLongHours_tooltip": "How long a long listing stays up, in in-game hours.",
+
+  "Sandbox_PhleaMarket_DurationMediumMult": "Medium listing fee multiplier",
+  "Sandbox_PhleaMarket_DurationMediumMult_tooltip": "Multiplies the listing fee for a medium listing. A short listing is always charged once.",
+
+  "Sandbox_PhleaMarket_DurationLongMult": "Long listing fee multiplier",
+  "Sandbox_PhleaMarket_DurationLongMult_tooltip": "Multiplies the listing fee for a long listing. Waiting longer for a buyer costs more.",
+
+  "Sandbox_PhleaMarket_FeeMode_option1": "Percentage of price",
+  "Sandbox_PhleaMarket_FeeMode_option2": "Fixed amount",
+
+  "Sandbox_PhleaMarket_ListingFeeMode": "Listing fee",
+  "Sandbox_PhleaMarket_ListingFeeMode_tooltip": "Whether the fee to put something up is a share of the asking price or a flat charge. A flat charge asks the same to list one nail as to list a gold bar.",
+
+  "Sandbox_PhleaMarket_ListingFeePercent": "Listing fee, percent",
+  "Sandbox_PhleaMarket_ListingFeePercent_tooltip": "Share of the asking total charged when a listing goes up, before the duration multiplier. Non-refundable. Zero makes listing free.",
+
+  "Sandbox_PhleaMarket_ListingFeeFixed": "Listing fee, fixed",
+  "Sandbox_PhleaMarket_ListingFeeFixed_tooltip": "Flat amount charged when a listing goes up, before the duration multiplier. Only used when the listing fee is set to a fixed amount.",
+
+  "Sandbox_PhleaMarket_CommissionMode": "Commission",
+  "Sandbox_PhleaMarket_CommissionMode_tooltip": "Whether the house takes a share of each sale or a flat cut. This is the main currency sink in the market.",
+
+  "Sandbox_PhleaMarket_CommissionPercent": "Commission, percent",
+  "Sandbox_PhleaMarket_CommissionPercent_tooltip": "Share of the sale taken from the seller's proceeds, applied per unit sold. Worked out when the listing goes up, so a seller sees their exact take-home before confirming.",
+
+  "Sandbox_PhleaMarket_CommissionFixed": "Commission, fixed",
+  "Sandbox_PhleaMarket_CommissionFixed_tooltip": "Flat amount taken from the seller's proceeds per sale. Only used when commission is set to a fixed amount.",
+
+  "Sandbox_PhleaMarket_FeePool": "Fee currency pool",
+  "Sandbox_PhleaMarket_FeePool_tooltip": "Which PhunMart wallet pool fees are taken from. Leave as change unless you have added a pool of your own.",
+
+  "Sandbox_PhleaMarket_MaxListings": "Listings per player",
+  "Sandbox_PhleaMarket_MaxListings_tooltip": "How many listings one account may have up at once. Counted per account, not per character, so a new survivor does not get a fresh allowance.",
+
+  "Sandbox_PhleaMarket_MaxStackQty": "Largest stack per listing",
+  "Sandbox_PhleaMarket_MaxStackQty_tooltip": "Ceiling on how many of one item a single listing may hold. Only items where every one is interchangeable can be listed as a stack.",
+
+  "Sandbox_PhleaMarket_MinPrice": "Minimum unit price",
+  "Sandbox_PhleaMarket_MinPrice_tooltip": "The least a seller may ask per item, in cents. Keep it aligned to five to match the rest of the change economy.",
+
+  "Sandbox_PhleaMarket_MaxPrice": "Maximum unit price",
+  "Sandbox_PhleaMarket_MaxPrice_tooltip": "The most a seller may ask per item, in cents. Stops a listing nobody could ever afford being used as free storage.",
+
+  "Sandbox_PhleaMarket_ReturnsExpiryHours": "Uncollected returns, hours",
+  "Sandbox_PhleaMarket_ReturnsExpiryHours_tooltip": "How long an expired item waits to be collected before it is discarded, in in-game hours. Without a limit the save carries every abandoned listing forever.",
+
+  "Sandbox_PhleaMarket_LogEntries": "Ledger size",
+  "Sandbox_PhleaMarket_LogEntries_tooltip": "How many transactions the admin ledger keeps before the oldest are dropped. This is what settles an argument about who was paid what. Zero turns it off."
+}

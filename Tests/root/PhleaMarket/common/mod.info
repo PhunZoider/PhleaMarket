@@ -1,0 +1,10 @@
+title=Phlea Market [DEV]
+name=Phlea Market [DEV]
+id=phleamarketdev
+authors=UburGeek
+description=Development build. Do not run alongside the release version.
+poster=poster.png
+icon=icon.png
+require=phunmart2dev
+versionMin=42.0.0
+pack=phleamarket

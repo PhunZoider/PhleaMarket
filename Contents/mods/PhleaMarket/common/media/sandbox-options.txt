@@ -1,0 +1,195 @@
+VERSION = 1,
+
+option PhleaMarket.Enabled
+{
+    type = boolean,
+    default = true,
+    page = PhleaMarket,
+    translation = PhleaMarket_Enabled,
+}
+
+option PhleaMarket.SimulatedSellers
+{
+    type = boolean,
+    default = false,
+    page = PhleaMarket,
+    translation = PhleaMarket_SimulatedSellers,
+}
+
+option PhleaMarket.DurationShortHours
+{
+    type = integer,
+    default = 24,
+    min = 1,
+    max = 8760,
+    page = PhleaMarket,
+    translation = PhleaMarket_DurationShortHours,
+}
+
+option PhleaMarket.DurationMediumHours
+{
+    type = integer,
+    default = 72,
+    min = 1,
+    max = 8760,
+    page = PhleaMarket,
+    translation = PhleaMarket_DurationMediumHours,
+}
+
+option PhleaMarket.DurationLongHours
+{
+    type = integer,
+    default = 168,
+    min = 1,
+    max = 8760,
+    page = PhleaMarket,
+    translation = PhleaMarket_DurationLongHours,
+}
+
+option PhleaMarket.DurationMediumMult
+{
+    type = integer,
+    default = 2,
+    min = 1,
+    max = 100,
+    page = PhleaMarket,
+    translation = PhleaMarket_DurationMediumMult,
+}
+
+option PhleaMarket.DurationLongMult
+{
+    type = integer,
+    default = 4,
+    min = 1,
+    max = 100,
+    page = PhleaMarket,
+    translation = PhleaMarket_DurationLongMult,
+}
+
+option PhleaMarket.ListingFeeMode
+{
+    type = enum,
+    numValues = 2,
+    default = 1,
+    page = PhleaMarket,
+    translation = PhleaMarket_ListingFeeMode,
+    valueTranslation = PhleaMarket_FeeMode,
+}
+
+option PhleaMarket.ListingFeePercent
+{
+    type = integer,
+    default = 2,
+    min = 0,
+    max = 100,
+    page = PhleaMarket,
+    translation = PhleaMarket_ListingFeePercent,
+}
+
+option PhleaMarket.ListingFeeFixed
+{
+    type = integer,
+    default = 0,
+    min = 0,
+    max = 100000,
+    page = PhleaMarket,
+    translation = PhleaMarket_ListingFeeFixed,
+}
+
+option PhleaMarket.CommissionMode
+{
+    type = enum,
+    numValues = 2,
+    default = 1,
+    page = PhleaMarket,
+    translation = PhleaMarket_CommissionMode,
+    valueTranslation = PhleaMarket_FeeMode,
+}
+
+option PhleaMarket.CommissionPercent
+{
+    type = integer,
+    default = 5,
+    min = 0,
+    max = 100,
+    page = PhleaMarket,
+    translation = PhleaMarket_CommissionPercent,
+}
+
+option PhleaMarket.CommissionFixed
+{
+    type = integer,
+    default = 25,
+    min = 0,
+    max = 100000,
+    page = PhleaMarket,
+    translation = PhleaMarket_CommissionFixed,
+}
+
+option PhleaMarket.FeePool
+{
+    type = string,
+    default = change,
+    page = PhleaMarket,
+    translation = PhleaMarket_FeePool,
+}
+
+option PhleaMarket.MaxListings
+{
+    type = integer,
+    default = 10,
+    min = 1,
+    max = 200,
+    page = PhleaMarket,
+    translation = PhleaMarket_MaxListings,
+}
+
+option PhleaMarket.MaxStackQty
+{
+    type = integer,
+    default = 100,
+    min = 1,
+    max = 10000,
+    page = PhleaMarket,
+    translation = PhleaMarket_MaxStackQty,
+}
+
+option PhleaMarket.MinPrice
+{
+    type = integer,
+    default = 5,
+    min = 1,
+    max = 100000,
+    page = PhleaMarket,
+    translation = PhleaMarket_MinPrice,
+}
+
+option PhleaMarket.MaxPrice
+{
+    type = integer,
+    default = 9999,
+    min = 1,
+    max = 1000000,
+    page = PhleaMarket,
+    translation = PhleaMarket_MaxPrice,
+}
+
+option PhleaMarket.ReturnsExpiryHours
+{
+    type = integer,
+    default = 336,
+    min = 1,
+    max = 8760,
+    page = PhleaMarket,
+    translation = PhleaMarket_ReturnsExpiryHours,
+}
+
+option PhleaMarket.LogEntries
+{
+    type = integer,
+    default = 2000,
+    min = 0,
+    max = 50000,
+    page = PhleaMarket,
+    translation = PhleaMarket_LogEntries,
+}

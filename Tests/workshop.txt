@@ -1,0 +1,15 @@
+version=1
+id=
+title=Phlea Market [DEV]
+description=[b]Development build. Not for general use.[/b]
+description=
+description=This is the testing version of [url=https://steamcommunity.com/sharedfiles/filedetails/?id=]Phlea Market[/url], published so a handful of people can break it before everyone else has to.
+description=
+description=It carries a different mod id to the release version, so both can be installed at once, but do not enable both in the same save.
+description=
+description=Requires the matching development build of PhunMart 2.
+description=
+description=Expect it to change without warning, and expect listings to be wiped between builds.
+description=
+tags=Build 42;Framework;Interface;Items;Multiplayer;Misc
+visibility=private

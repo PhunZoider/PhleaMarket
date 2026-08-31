@@ -1,0 +1,10 @@
+title=Phlea Market
+name=Phlea Market
+id=phleamarket
+authors=UburGeek
+description=A vending machine that stocks itself from other players' pockets. Requires PhunMart 2.
+poster=poster.png
+icon=icon.png
+require=phunmart2
+versionMin=42.0.0
+pack=phleamarket

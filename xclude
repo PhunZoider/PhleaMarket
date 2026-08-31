@@ -1,0 +1,17 @@
+LICENSE
+README.md
+CLAUDE.md
+.vscode
+.git\
+.gitignore
+.claude
+Docs
+Tests
+xclude
+deploy.cmd
+run.cmd
+ServerFiles
+.xcf
+.cursor
+.html
+converter
