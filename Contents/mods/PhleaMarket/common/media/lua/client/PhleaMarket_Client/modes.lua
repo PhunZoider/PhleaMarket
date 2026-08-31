@@ -423,6 +423,14 @@ function Modes.activate(ui)
         end
         return
     end
+    -- How many, when there is more than one to be had. Buying fifty nails was
+    -- fifty presses of the same button, and the server had taken a quantity
+    -- since the day it was written -- the client simply never asked for one.
+    local row = Modes.rowFor(ui, ui.selectedOffer)
+    if row then
+        Market.ui.askQuantity(row)
+        return
+    end
     Client.send(C.buy, {
         listingId = ui.selectedId,
         qty = 1

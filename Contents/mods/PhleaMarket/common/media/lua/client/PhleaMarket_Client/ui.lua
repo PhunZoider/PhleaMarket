@@ -496,4 +496,187 @@ function UI.askPrice(window, row)
     return dialog
 end
 
+
+---------------------------------------------------------------------------
+-- How many to buy
+---------------------------------------------------------------------------
+
+local Buy = ISPanel:derive("PhleaMarketBuyDialog")
+
+local BW, BH = 300, 190
+
+function Buy:new(x, y, row)
+    local o = ISPanel:new(x, y, math.floor(BW * FS), math.floor(BH * FS))
+    setmetatable(o, self)
+    self.__index = self
+    o.row = row
+    o.moveWithMouse = true
+    o.backgroundColor = {
+        r = 0.05,
+        g = 0.05,
+        b = 0.06,
+        a = 0.95
+    }
+    o.borderColor = {
+        r = 0.25,
+        g = 0.45,
+        b = 0.28,
+        a = 1
+    }
+    return o
+end
+
+function Buy:createChildren()
+    ISPanel.createChildren(self)
+    local pad = math.floor(12 * FS)
+    local lineH = FONT_SM + math.floor(8 * FS)
+    local y = pad + FONT_SM * 2
+
+    local boxW = math.floor(70 * FS)
+    local maxW = math.floor(52 * FS)
+
+    self.qtyBox = ISTextEntryBox:new("1", self.width - pad - boxW - maxW - math.floor(4 * FS), y, boxW, lineH)
+    self.qtyBox:initialise()
+    self.qtyBox:instantiate()
+    self.qtyBox:setOnlyNumbers(true)
+    self:addChild(self.qtyBox)
+
+    -- Because "all of them" is the common answer and typing it is not.
+    self.maxBtn = ISButton:new(self.width - pad - maxW, y, maxW, lineH, getText("IGUI_PhleaMarket_Max"), self,
+        Buy.onMax)
+    self.maxBtn:initialise()
+    self.maxBtn:instantiate()
+    self.maxBtn.font = UIFont.Small
+    self:addChild(self.maxBtn)
+
+    self.figuresY = y + lineH + math.floor(10 * FS)
+
+    local okW = math.floor((self.width - pad * 2 - math.floor(8 * FS)) / 2)
+    self.okBtn = ISButton:new(pad, self.height - pad - lineH, okW, lineH, getText("IGUI_PhunMart_Buy"), self,
+        Buy.onOK)
+    self.okBtn:initialise()
+    self.okBtn:instantiate()
+    self.okBtn.backgroundColor = {
+        r = 0.06,
+        g = 0.26,
+        b = 0.08,
+        a = 0.95
+    }
+    self:addChild(self.okBtn)
+
+    self.cancelBtn = ISButton:new(self.width - pad - okW, self.height - pad - lineH, okW, lineH,
+        getText("IGUI_PhleaMarket_Close"), self, Buy.onCancel)
+    self.cancelBtn:initialise()
+    self.cancelBtn:instantiate()
+    self:addChild(self.cancelBtn)
+end
+
+function Buy:onMax()
+    self.qtyBox:setText(tostring(self.row.qty or 1))
+end
+
+--- What is being bought, clamped to what is there.
+---
+--- Clamped here and put back in the box by render, so the number on screen is
+--- the number that will be charged for. The server clamps again, because a
+--- figure arriving from a client is a request.
+function Buy:value()
+    local qty = math.floor(tonumber(self.qtyBox:getInternalText()) or 1)
+    if qty < 1 then
+        qty = 1
+    end
+    if qty > (self.row.qty or 1) then
+        qty = self.row.qty or 1
+    end
+    return qty
+end
+
+function Buy:render()
+    ISPanel.render(self)
+    local pad = math.floor(12 * FS)
+    local pool = self.row.pool or "change"
+
+    self:drawText(getText("IGUI_PhleaMarket_BuyTitle", self.row.itemName or "?"), pad, pad, 1, 1, 1, 1, UIFont.Medium)
+
+    local qty = self:value()
+    if tostring(qty) ~= self.qtyBox:getInternalText() then
+        local typed = tonumber(self.qtyBox:getInternalText())
+        if typed and typed > (self.row.qty or 1) then
+            self.qtyBox:setText(tostring(qty))
+        end
+    end
+
+    self:drawText(getText("IGUI_PhleaMarket_HowManyOf", tostring(self.row.qty or 1)), pad,
+        self.qtyBox:getY() + math.floor(4 * FS), 0.8, 0.8, 0.8, 1, UIFont.Small)
+
+    local total = (self.row.unit or 0) * qty
+    local balance = Core.wallet and Core.wallet:getBalance(getPlayer(), pool) or 0
+    local afford = balance >= total
+
+    local y = self.figuresY
+    self:drawText(getText("IGUI_PhleaMarket_EachAt", Market.formatAmount(pool, self.row.unit or 0)), pad, y, 0.75,
+        0.75, 0.75, 1, UIFont.Small)
+    y = y + FONT_SM + math.floor(3 * FS)
+    self:drawText(getText("IGUI_PhleaMarket_Total", Market.formatAmount(pool, total)), pad, y, 1, 0.88, 0.45, 1,
+        UIFont.Small)
+    y = y + FONT_SM + math.floor(3 * FS)
+
+    -- Said whichever way it falls. Knowing the balance is only useful next to
+    -- the total, and knowing it is short is the thing worth colouring.
+    if afford then
+        self:drawText(getText("IGUI_PhleaMarket_YouHave", Market.formatAmount(pool, balance)), pad, y, 0.55, 0.55,
+            0.55, 1, UIFont.Small)
+    else
+        self:drawText(getText("IGUI_PhleaMarket_ShortBy", Market.formatAmount(pool, total - balance)), pad, y, 0.95,
+            0.45, 0.4, 1, UIFont.Small)
+    end
+
+    self.okBtn:setEnable(afford and qty >= 1)
+end
+
+function Buy:onOK()
+    local qty = self:value()
+    local balance = Core.wallet and Core.wallet:getBalance(getPlayer(), self.row.pool or "change") or 0
+    if qty < 1 or balance < (self.row.unit or 0) * qty then
+        return
+    end
+    Client.send(C.buy, {
+        listingId = self.row.id,
+        qty = qty
+    })
+    self:onCancel()
+end
+
+function Buy:onCancel()
+    self:removeFromUIManager()
+    self:setVisible(false)
+    UI.buyDialog = nil
+end
+
+--- Ask how many, when there is more than one to be had.
+---
+--- Only then. A listing of one has no question to put, and a dialog that only
+--- ever has one answer is a click asking permission to do what was already
+--- asked for.
+function UI.askQuantity(row)
+    if (row.qty or 1) <= 1 then
+        Client.send(C.buy, {
+            listingId = row.id,
+            qty = 1
+        })
+        return nil
+    end
+    if UI.buyDialog then
+        UI.buyDialog:onCancel()
+    end
+    local core = getCore()
+    local x = math.floor((core:getScreenWidth() - BW * FS) / 2)
+    local y = math.floor((core:getScreenHeight() - BH * FS) / 2)
+    local dialog = Buy:new(x, y, row)
+    dialog:initialise()
+    dialog:addToUIManager()
+    UI.buyDialog = dialog
+    return dialog
+end
+
 return UI
