@@ -328,6 +328,20 @@ function Dialog:render()
     -- functions it will use, so what is shown here and what is charged cannot
     -- drift apart.
     local price, qty = self:values()
+
+    -- Put the clamp back in the box the moment it is exceeded.
+    --
+    -- values() has always clamped what gets sent, but the box went on showing
+    -- whatever was typed, so asking for a thousand of something looked like it
+    -- had been accepted right up until the listing came back holding twelve.
+    -- Showing one number and acting on another is the part that was wrong.
+    if self.qtyBox and tostring(qty) ~= self.qtyBox:getInternalText() then
+        local typed = tonumber(self.qtyBox:getInternalText())
+        if typed and typed > self.row.count then
+            self.qtyBox:setText(tostring(qty))
+        end
+    end
+
     local total = price * qty
     local fee = Market.listingFeeFor(total, self.duration)
     local commission = Listings.applyFee(Market.commissionRule(), total)

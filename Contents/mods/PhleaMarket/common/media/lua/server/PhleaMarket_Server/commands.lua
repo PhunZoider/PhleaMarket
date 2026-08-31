@@ -65,6 +65,17 @@ Commands[C.list] = function(playerObj, args)
     local hours = Store.duration(args.duration)
     local limits = Store.limits()
 
+    -- Bounded here as well as in the dialog. The client clamps what it sends,
+    -- but the client is not the authority on anything: a number arriving from
+    -- it is a request, and the only figures that matter are the ones this side
+    -- checks and the count escrow actually removes.
+    if qty < 1 then
+        return fail(playerObj, "BadQuantity")
+    end
+    if limits.maxQty and qty > limits.maxQty then
+        qty = limits.maxQty
+    end
+
     -- Check the limit before taking anything out of the seller's bag. Refusing
     -- afterwards would mean handing it straight back, and a failure that
     -- touches the inventory at all is a failure with a way to go wrong.
@@ -97,10 +108,17 @@ Commands[C.list] = function(playerObj, args)
         return fail(playerObj, "NotHeld")
     end
 
-    local snapshot, why = Store.escrow(playerObj, fullType, qty)
+    local snapshot, taken = Store.escrow(playerObj, fullType, qty)
     if not snapshot then
-        return fail(playerObj, why or "NotHeld")
+        return fail(playerObj, taken or "NotHeld")
     end
+
+    -- From here on the listing is about what left the bag, never about what was
+    -- asked for. The fee is worked out again on that basis, since it is a share
+    -- of the asking total and the asking total just changed.
+    qty = taken
+    askingTotal = price * qty
+    fee = Market.listingFeeFor(askingTotal, args.duration)
 
     local listing, createFailed = Listings.create(store, {
         seller = nameOf(playerObj),

@@ -240,15 +240,22 @@ function Store.escrow(playerObj, fullType, qty)
         return nil, "NotEnough"
     end
 
-    local taken = {}
+    local taken = 0
     for _, item in ipairs(alike) do
         local container = item:getContainer() or inv
         container:Remove(item)
         sendRemoveItemFromContainer(container, item)
-        table.insert(taken, item)
+        taken = taken + 1
     end
 
-    return snapshot
+    -- How many were actually removed, not how many were asked for.
+    --
+    -- The listing is built from this. They should always agree -- the count is
+    -- checked above before anything moves -- but "should always agree" is how
+    -- you get a listing for ten of something when six were taken, and a
+    -- cancelled listing hands back what it says it holds. The number that can
+    -- be trusted is the one counted while removing them.
+    return snapshot, taken
 end
 
 ---------------------------------------------------------------------------
