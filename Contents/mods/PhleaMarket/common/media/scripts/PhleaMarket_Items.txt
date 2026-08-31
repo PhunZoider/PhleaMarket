@@ -1,0 +1,20 @@
+module PhunMart
+{
+    imports
+    {
+        Base,
+    }
+
+    item PhleaMarket
+    {
+        DisplayCategory   = Furniture,
+        ItemType          = base:moveable,
+        Icon              = VendingMachine,
+        Weight            = 250,
+        DisplayName       = Phlea Market Vending Machine,
+        WorldObjectSprite = phleamarket_01_0,
+        
+    }
+
+
+}
