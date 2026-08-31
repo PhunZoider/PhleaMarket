@@ -5,6 +5,8 @@
   "IGUI_PhleaMarket_Mode_Returns": "Returns",
 
   "IGUI_PhleaMarket_BuyBack": "Buy back",
+  "IGUI_PhleaMarket_AllCategories": "Everything",
+  "IGUI_PhleaMarket_SearchHint": "Search by item name. Start with @ to search by seller instead.",
   "IGUI_PhleaMarket_List": "List",
   "IGUI_PhleaMarket_Cancel": "Cancel",
   "IGUI_PhleaMarket_Collect": "Collect",

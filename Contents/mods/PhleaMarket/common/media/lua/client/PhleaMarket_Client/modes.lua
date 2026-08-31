@@ -15,15 +15,19 @@ end
 -- does icons, categories, tooltips and scrolling, and none of it needed
 -- changing to show listings instead of stock.
 
+require "ISUI/ISComboBox"
+require "ISUI/ISTextEntryBox"
 require "PhleaMarket/core"
 require "PhleaMarket/commands"
 require "PhleaMarket_Client/commands"
 
 local Core = PhunMart
 local Market = PhleaMarket
+local tools = require "PhunMart_Client/ui/ui_utils"
 local Snapshot = require "PhleaMarket/item_snapshot"
 local Client = Market.client
 local C = Market.commands
+local FS = tools.FONT_SCALE
 
 local Modes = {}
 Market.modes = Modes
@@ -88,6 +92,48 @@ end
 -- Buy
 ---------------------------------------------------------------------------
 
+--- The display category of an item type, as the grid would group it.
+---
+--- Read from the script rather than sent with the listing, because it is the
+--- same answer for every listing of a type and the client already has it.
+local function categoryOf(fullType)
+    local manager = getScriptManager()
+    local script = manager and manager:getItem(fullType)
+    local category = script and script:getDisplayCategory()
+    if not category or category == "" then
+        return "Other"
+    end
+    return category
+end
+
+--- Whether a listing survives the filter strip.
+---
+--- Case-insensitive substring on the item name, and a leading @ switches to the
+--- seller instead: @steve finds everything Steve has up, which is the question
+--- players actually ask each other.
+local function matches(ui, row)
+    local state = ui._phleaFilter
+    if not state then
+        return true
+    end
+    if state.category and state.category ~= "" and categoryOf(row.fullType) ~= state.category then
+        return false
+    end
+    local search = state.search
+    if not search or search == "" then
+        return true
+    end
+    search = search:lower()
+    if search:sub(1, 1) == "@" then
+        local who = search:sub(2)
+        if who == "" then
+            return true
+        end
+        return ((row.sellerChar or "") .. " " .. (row.seller or "")):lower():find(who, 1, true) ~= nil
+    end
+    return ((row.itemName or "") .. " " .. (row.fullType or "")):lower():find(search, 1, true) ~= nil
+end
+
 Core.registerShopMode({
     key = "market",
     label = "IGUI_PhleaMarket_Mode_Buy",
@@ -98,14 +144,53 @@ Core.registerShopMode({
         refresh(ui, C.browse)
     end,
 
+    --- A category dropdown and a search box, along the strip the window lends
+    --- a mode. Both filter what is already here rather than asking again: a
+    --- search that goes to the server on every keystroke is unusable at any
+    --- latency, and the whole active market arrives in one browse anyway.
+    createFilter = function(ui, x, y, w, h)
+        ui._phleaFilter = ui._phleaFilter or {}
+        local state = ui._phleaFilter
+
+        local comboW = math.floor(w * 0.42)
+        local combo = ISComboBox:new(x, y, comboW, h, ui, function(target, box)
+            -- The option data, not its text: the labels carry a count, so the
+            -- text no longer is the category name.
+            state.category = box:getOptionData(box.selected)
+            target:refreshGrid()
+        end)
+        combo:initialise()
+        combo.font = UIFont.Small
+        Modes.fillCategories(combo, state.category)
+
+        local box = ISTextEntryBox:new(state.search or "", x + comboW + math.floor(4 * FS), y, w - comboW -
+            math.floor(4 * FS), h)
+        box:initialise()
+        box:instantiate()
+        box.onTextChange = function()
+            state.search = box:getInternalText()
+            ui:refreshGrid()
+        end
+        box:setTooltip(getText("IGUI_PhleaMarket_SearchHint"))
+
+        ui._phleaCombo = combo
+        return {combo, box}
+    end,
+
     getGridData = function(ui)
         local browse = Client.data.browse
         if not (browse and browse.listings) then
             return emptyGrid(ui)
         end
+        -- Rebuilt from what arrived, so a category that no longer has anything
+        -- listed stops being offered rather than becoming a filter that empties
+        -- the grid.
+        Modes.fillCategories(ui._phleaCombo, ui._phleaFilter and ui._phleaFilter.category, browse.listings)
         local offers = {}
         for _, row in ipairs(browse.listings) do
-            offers[row.id] = asOffer(row.id, row.fullType, row.unit, row.pool, row.qty)
+            if matches(ui, row) then
+                offers[row.id] = asOffer(row.id, row.fullType, row.unit, row.pool, row.qty)
+            end
         end
         return gridOf(ui, offers)
     end,
@@ -324,6 +409,56 @@ Core.registerShopMode({
 ---------------------------------------------------------------------------
 -- Helpers the modes share
 ---------------------------------------------------------------------------
+
+--- The label on the first entry in the dropdown, which carries no category
+--- data and therefore means no filter. Resolved on first use rather than at
+--- load, since getText wants the translations loaded.
+Modes.ALL_CATEGORIES = nil
+
+--- Fill the dropdown from the categories actually on the market.
+---
+--- Built from what is listed rather than from every category in the game, so a
+--- player is never offered a filter that empties the grid, and the counts say
+--- how much is behind each one. Rebuilt whenever the listings change, keeping
+--- the current choice if it still exists.
+function Modes.fillCategories(combo, current, listings)
+    if not combo then
+        return
+    end
+    Modes.ALL_CATEGORIES = getText("IGUI_PhleaMarket_AllCategories")
+
+    listings = listings or (Client.data.browse and Client.data.browse.listings) or {}
+    local counts, names = {}, {}
+    for _, row in ipairs(listings) do
+        local category = categoryOf(row.fullType)
+        if not counts[category] then
+            counts[category] = 0
+            table.insert(names, category)
+        end
+        counts[category] = counts[category] + 1
+    end
+    table.sort(names)
+
+    -- Nothing changed, so leave it alone: rebuilding a dropdown a player has
+    -- open closes it under them.
+    local signature = table.concat(names, "|")
+    if combo._phleaSignature == signature then
+        return
+    end
+    combo._phleaSignature = signature
+
+    combo:clear()
+    -- nil data on the first entry is what "no filter" means downstream.
+    combo:addOptionWithData(Modes.ALL_CATEGORIES, nil)
+    local selected = 1
+    for i, name in ipairs(names) do
+        combo:addOptionWithData(name .. "  (" .. counts[name] .. ")", name)
+        if name == current then
+            selected = i + 1
+        end
+    end
+    combo.selected = selected
+end
 
 function Modes.username()
     local player = getPlayer()
