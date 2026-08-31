@@ -95,7 +95,11 @@ end
 
 local Dialog = ISPanel:derive("PhleaMarketPriceDialog")
 
-local W, H = 320, 268
+-- Taller than the figures alone need, for the three lines of guidance under
+-- them. Naming a price with nothing to go on is the hardest thing this mod
+-- asks of a player, and it is the one place where a few numbers turn a guess
+-- into a decision.
+local W, H = 320, 330
 
 function Dialog:new(x, y, window, row)
     local o = ISPanel:new(x, y, math.floor(W * FS), math.floor(H * FS))
@@ -131,10 +135,12 @@ function Dialog:createChildren()
     self.priceBox:initialise()
     self.priceBox:instantiate()
     self.priceBox:setOnlyNumbers(true)
-    -- Prefilled with what they asked for one of these last time, which is very
-    -- often what they want again, and is the whole reason the server remembers.
-    self.priceBox:setText(tostring(Market.lastAsk and Market.lastAsk[self.row.fullType] or
-                                       Market.limits().minPrice))
+    -- Opens at the floor, and moves to what this account asked for one of these
+    -- last time once the server says. That answer cannot be here yet -- it is
+    -- still in flight when the dialog is built -- so render applies it, and only
+    -- while the box still holds this untouched starting value.
+    self._initialText = tostring(Market.lastAsk and Market.lastAsk[self.row.fullType] or Market.limits().minPrice)
+    self.priceBox:setText(self._initialText)
     self:addChild(self.priceBox)
 
     -- A line's worth of room under the box for the allowed range. A limit a
@@ -309,6 +315,55 @@ function Dialog:render()
     -- is what lands in their wallet if it all sells.
     self:drawText(getText("IGUI_PhleaMarket_YouGet", Market.formatAmount(pool, total - commission)), pad, y, 0.5,
         0.9, 0.5, 1, UIFont.Small)
+
+    -- What anybody would want to know before naming a figure: what the market
+    -- is asking for one of these, what it has actually been paying, and what
+    -- this account asked the last time. Only shown for the item in hand, since
+    -- a reply for a different one is worse than none.
+    y = y + FONT_SM + math.floor(8 * FS)
+    local info = Client.data.priceInfo
+    if info and info.fullType == self.row.fullType then
+        -- Fill in the remembered price, once, and never over something typed:
+        -- an answer arriving a moment after the player started typing must not
+        -- take the keyboard off them.
+        if info.lastAsk and not self._prefilled then
+            self._prefilled = true
+            if self.priceBox:getInternalText() == self._initialText then
+                self.priceBox:setText(tostring(info.lastAsk))
+            end
+        end
+
+        local guide = info.guide
+        if guide then
+            self:drawText(getText("IGUI_PhleaMarket_Listed", Market.formatAmount(pool, guide.low),
+                Market.formatAmount(pool, guide.high), tostring(guide.count)), pad, y, 0.7, 0.75, 0.85, 1,
+                UIFont.Small)
+        else
+            self:drawText(getText("IGUI_PhleaMarket_NoneListed"), pad, y, 0.55, 0.55, 0.55, 1, UIFont.Small)
+        end
+        y = y + FONT_SM + math.floor(2 * FS)
+
+        local sold = info.sold or {}
+        if #sold > 0 then
+            -- The most recent few rather than an average. An average of three
+            -- sales says less than the three sales do, and hides that there
+            -- were only three.
+            local parts = {}
+            for i = 1, math.min(#sold, 3) do
+                table.insert(parts, Market.formatAmount(pool, sold[i].unit))
+            end
+            self:drawText(getText("IGUI_PhleaMarket_SoldFor", table.concat(parts, ", ")), pad, y, 0.7, 0.75, 0.85, 1,
+                UIFont.Small)
+        else
+            self:drawText(getText("IGUI_PhleaMarket_NeverSold"), pad, y, 0.55, 0.55, 0.55, 1, UIFont.Small)
+        end
+        y = y + FONT_SM + math.floor(2 * FS)
+
+        if info.lastAsk then
+            self:drawText(getText("IGUI_PhleaMarket_YouAsked", Market.formatAmount(pool, info.lastAsk)), pad, y, 0.6,
+                0.6, 0.6, 1, UIFont.Small)
+        end
+    end
 end
 
 function Dialog:onOK()
@@ -346,6 +401,14 @@ function UI.askPrice(window, row)
     if UI.dialog then
         UI.dialog:onCancel()
     end
+
+    -- Cleared before asking, so a stale answer for the last item cannot be read
+    -- as this one's while the reply is in flight. render checks the type too;
+    -- this stops the wrong figures appearing for even a frame.
+    Client.data.priceInfo = nil
+    Client.send(C.priceInfo, {
+        fullType = row.fullType
+    })
     local core = getCore()
     local x = math.floor((core:getScreenWidth() - W * FS) / 2)
     local y = math.floor((core:getScreenHeight() - H * FS) / 2)

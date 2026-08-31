@@ -27,6 +27,11 @@
   "IGUI_PhleaMarket_FeeNow": "Costs %1 to list, not refunded",
   "IGUI_PhleaMarket_FeeFree": "Free to list",
   "IGUI_PhleaMarket_YouGet": "You get %1 if it all sells",
+  "IGUI_PhleaMarket_Listed": "Listed now: %1 to %2 (%3)",
+  "IGUI_PhleaMarket_NoneListed": "None listed right now",
+  "IGUI_PhleaMarket_SoldFor": "Recently sold: %1",
+  "IGUI_PhleaMarket_NeverSold": "None sold yet",
+  "IGUI_PhleaMarket_YouAsked": "You last asked %1",
 
   "IGUI_PhleaMarket_Msg_Listed": "Listed.",
   "IGUI_PhleaMarket_Msg_ListedWithFee": "Listed. %1 listing fee.",

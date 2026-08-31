@@ -139,6 +139,11 @@ Commands[C.list] = function(playerObj, args)
         Store.charge(playerObj, pool, fee)
     end
 
+    -- Remembered so the next one of these opens at this price rather than at
+    -- the floor. Recorded on success only: a price that was refused is not a
+    -- price this account decided on.
+    Listings.rememberAsk(store, listing.seller, fullType, price)
+
     Store.log({
         event = Listings.EVENT.LIST,
         actor = listing.seller,
@@ -475,6 +480,14 @@ Commands[C.group] = function(playerObj, args)
         rows = rows,
         guide = Listings.priceGuide(store, args.fullType)
     })
+end
+
+--- Everything worth knowing before naming a price: what the market is asking,
+--- what it has been paying, and what this account asked last time.
+Commands[C.priceInfo] = function(playerObj, args)
+    args = args or {}
+    Store.respond(playerObj, C.priceInfoData,
+        Listings.priceInfo(Store.get(), nameOf(playerObj), args.fullType))
 end
 
 Commands[C.mine] = function(playerObj, args)

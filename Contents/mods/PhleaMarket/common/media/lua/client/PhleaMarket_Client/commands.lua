@@ -26,6 +26,7 @@ Client.data = {
     browse = nil,
     group = nil,
     mine = nil,
+    priceInfo = nil,
     admin = nil
 }
 
@@ -57,6 +58,11 @@ end
 handlers[C.groupData] = function(payload)
     Client.data.group = payload
     triggerEvent(Market.events.OnData, "group", payload)
+end
+
+handlers[C.priceInfoData] = function(payload)
+    Client.data.priceInfo = payload
+    triggerEvent(Market.events.OnData, "priceInfo", payload)
 end
 
 handlers[C.mineData] = function(payload)

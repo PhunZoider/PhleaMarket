@@ -591,6 +591,90 @@ do
     ok("a cap of zero turns it off", #store.log == 0)
 end
 
+print("-- what to ask for it --")
+do
+    local store = L.newStore()
+    ok("nothing remembered yet", L.lastAsk(store, "steve", "Base.Axe") == nil)
+
+    L.rememberAsk(store, "steve", "Base.Axe", 450)
+    ok("remembers what was asked", L.lastAsk(store, "steve", "Base.Axe") == 450)
+    -- Per account, not per item, and not shared between people.
+    ok("not for a different item", L.lastAsk(store, "steve", "Base.Saw") == nil)
+    ok("not for a different account", L.lastAsk(store, "dave", "Base.Axe") == nil)
+
+    L.rememberAsk(store, "steve", "Base.Axe", 500)
+    ok("the latest wins", L.lastAsk(store, "steve", "Base.Axe") == 500)
+
+    L.rememberAsk(store, "steve", "Base.Axe", 0)
+    ok("nothing is not a price worth remembering", L.lastAsk(store, "steve", "Base.Axe") == 500)
+end
+
+print("-- what it has sold for --")
+do
+    -- Read back out of the ledger rather than kept twice.
+    local store = L.newStore()
+    local function sale(item, unit, at, self_)
+        L.record(store, 100, {
+            event = L.EVENT.BUY,
+            item = item,
+            unit = unit,
+            qty = 1,
+            at = at,
+            selfPurchase = self_
+        })
+    end
+    sale("Base.Axe", 100, 1000)
+    sale("Base.Saw", 999, 1001)
+    sale("Base.Axe", 200, 1002)
+    sale("Base.Axe", 300, 1003)
+
+    local sold = L.soldPrices(store, "Base.Axe", 5)
+    ok("only this item", #sold == 3)
+    ok("most recent first", sold[1].unit == 300 and sold[3].unit == 100)
+    ok("respects the limit", #L.soldPrices(store, "Base.Axe", 2) == 2)
+    ok("nothing sold, nothing to say", #L.soldPrices(store, "Base.Hammer", 5) == 0)
+
+    -- Buying your own listing is allowed, but counting it would let a player
+    -- set the reference price everyone else is shown by trading with himself.
+    sale("Base.Axe", 9999, 1004, true)
+    local after = L.soldPrices(store, "Base.Axe", 5)
+    ok("a self-purchase is not a market price", #after == 3 and after[1].unit == 300)
+
+    -- An expiry has no unit price on it and must not be read as a sale.
+    L.record(store, 100, {
+        event = L.EVENT.EXPIRE,
+        item = "Base.Axe",
+        at = 1005
+    })
+    ok("and neither is an expiry", #L.soldPrices(store, "Base.Axe", 5) == 3)
+end
+
+print("-- everything a seller needs before naming a price --")
+do
+    local store = L.newStore()
+    list(store, {
+        seller = "dave",
+        fullType = "Base.Axe",
+        amount = 400
+    })
+    L.rememberAsk(store, "steve", "Base.Axe", 350)
+    L.record(store, 100, {
+        event = L.EVENT.BUY,
+        item = "Base.Axe",
+        unit = 380,
+        qty = 1,
+        at = 1000
+    })
+
+    local info = L.priceInfo(store, "steve", "Base.Axe")
+    ok("what the market is asking", info.guide and info.guide.low == 400)
+    ok("what it has been paying", #info.sold == 1 and info.sold[1].unit == 380)
+    ok("and what you asked last time", info.lastAsk == 350)
+
+    local nothing = L.priceInfo(store, "steve", "Base.Hammer")
+    ok("an item nobody has traded says so", nothing.guide == nil and #nothing.sold == 0)
+end
+
 print("-- browsing: one row per item type --")
 do
     local store = L.newStore()

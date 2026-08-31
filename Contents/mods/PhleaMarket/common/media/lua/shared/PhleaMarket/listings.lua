@@ -63,7 +63,11 @@ function Listings.newStore()
         nextId = 1,
         listings = {},
         returns = {},
-        log = {}
+        log = {},
+        -- What each account last asked for each item type. Small, and it
+        -- outlives the listing it came from, which is the point: the useful
+        -- default when selling a second axe is what you asked for the first.
+        asks = {}
     }
 end
 
@@ -690,6 +694,72 @@ function Listings.priceGuide(store, fullType)
         high = prices[#prices],
         median = median,
         count = #prices
+    }
+end
+
+---------------------------------------------------------------------------
+-- What to ask for it
+---------------------------------------------------------------------------
+
+--- Remember what somebody asked, so the next one of these starts there.
+---
+--- Kept per account rather than per character, like everything else here: it is
+--- the person who learns what a hammer goes for, not the survivor.
+function Listings.rememberAsk(store, seller, fullType, amount)
+    if type(seller) ~= "string" or type(fullType) ~= "string" then
+        return
+    end
+    amount = math.floor(tonumber(amount) or 0)
+    if amount <= 0 then
+        return
+    end
+    store.asks = store.asks or {}
+    store.asks[seller] = store.asks[seller] or {}
+    store.asks[seller][fullType] = amount
+end
+
+function Listings.lastAsk(store, seller, fullType)
+    local mine = store.asks and store.asks[seller]
+    return mine and mine[fullType] or nil
+end
+
+--- What this item type has actually changed hands for, most recent first.
+---
+--- Read back out of the ledger rather than kept as its own list. The ledger is
+--- already the record of every sale, already capped, and already persisted; a
+--- second store of the same numbers is a second thing to keep in step.
+---
+--- Self-purchases are left out. Buying your own listing is allowed and is a
+--- strictly worse Cancel, but counting it here would let a player set the
+--- reference price everyone else is shown by trading with themselves.
+function Listings.soldPrices(store, fullType, limit)
+    limit = tonumber(limit) or 5
+    local out = {}
+    local log = store.log or {}
+    for i = #log, 1, -1 do
+        local entry = log[i]
+        if entry.event == Listings.EVENT.BUY and entry.item == fullType and not entry.selfPurchase and entry.unit then
+            table.insert(out, {
+                unit = entry.unit,
+                qty = entry.qty,
+                at = entry.at
+            })
+            if #out >= limit then
+                break
+            end
+        end
+    end
+    return out
+end
+
+--- Everything worth showing somebody about to name a price: what the market is
+--- asking, what it has been paying, and what they asked last time.
+function Listings.priceInfo(store, seller, fullType)
+    return {
+        fullType = fullType,
+        guide = Listings.priceGuide(store, fullType),
+        sold = Listings.soldPrices(store, fullType, 5),
+        lastAsk = Listings.lastAsk(store, seller, fullType)
     }
 end
 

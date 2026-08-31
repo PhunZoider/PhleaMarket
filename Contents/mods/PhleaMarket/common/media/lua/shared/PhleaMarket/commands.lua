@@ -20,6 +20,7 @@ PhleaMarket.commands = {
     relist = "PhleaRelist",
     browse = "PhleaBrowse",
     group = "PhleaGroup",
+    priceInfo = "PhleaPriceInfo",
     mine = "PhleaMine",
 
     -- Admin
@@ -31,6 +32,7 @@ PhleaMarket.commands = {
     result = "PhleaResult",
     browseData = "PhleaBrowseData",
     groupData = "PhleaGroupData",
+    priceInfoData = "PhleaPriceInfoData",
     mineData = "PhleaMineData",
     returnsData = "PhleaReturnsData",
     adminData = "PhleaAdminData"
