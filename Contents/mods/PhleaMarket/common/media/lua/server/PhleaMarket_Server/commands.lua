@@ -485,9 +485,25 @@ Commands[C.adminList] = function(playerObj, args)
         return
     end
     local store = Store.get()
+
+    -- Projected rather than sent whole. A listing carries the snapshot of the
+    -- item in escrow, mod data and all, and an admin screen showing a name, a
+    -- seller and a price has no use for any of it.
     local all = {}
     for _, listing in pairs(store.listings or {}) do
-        table.insert(all, listing)
+        table.insert(all, {
+            id = listing.id,
+            seller = listing.seller,
+            sellerChar = listing.sellerChar,
+            fullType = listing.fullType,
+            itemName = listing.itemName,
+            qty = listing.qty,
+            qtyListed = listing.qtyListed,
+            unitPrice = listing.unitPrice,
+            status = listing.status,
+            listedAt = listing.listedAt,
+            expiresAt = listing.expiresAt
+        })
     end
     table.sort(all, function(a, b)
         return (a.listedAt or 0) > (b.listedAt or 0)

@@ -53,5 +53,23 @@
   "IGUI_PhleaMarket_Err_ItemUnavailable": "That item no longer exists in this game.",
   "IGUI_PhleaMarket_Err_CouldNotDeliver": "No room for it. You have not been charged.",
   "IGUI_PhleaMarket_Err_CouldNotList": "It could not be listed. Your item has been returned.",
-  "IGUI_PhleaMarket_Err_Unknown": "That did not work (%1)."
+  "IGUI_PhleaMarket_Err_Unknown": "That did not work (%1).",
+
+  "IGUI_PhleaMarket_Adm_Tab": "Listings",
+  "IGUI_PhleaMarket_Adm_Desc": "Everything on the market, and a record of what has happened to it. Pulling a listing takes it off sale and returns the goods to whoever listed them.",
+  "IGUI_PhleaMarket_Adm_Active": "On sale",
+  "IGUI_PhleaMarket_Adm_All": "All",
+  "IGUI_PhleaMarket_Adm_Ledger": "Ledger",
+  "IGUI_PhleaMarket_Adm_Item": "Item",
+  "IGUI_PhleaMarket_Adm_Seller": "Seller",
+  "IGUI_PhleaMarket_Adm_Qty": "Left",
+  "IGUI_PhleaMarket_Adm_Price": "Each",
+  "IGUI_PhleaMarket_Adm_When": "When",
+  "IGUI_PhleaMarket_Adm_Refresh": "Refresh",
+  "IGUI_PhleaMarket_Adm_Pull": "Pull listing",
+  "IGUI_PhleaMarket_Adm_PullConfirm": "Take %1 off the market?\n\nIt was listed by %2, and goes back to them to collect.",
+  "IGUI_PhleaMarket_Adm_Soon": "under an hour",
+  "IGUI_PhleaMarket_Adm_Hours": "%1h",
+  "IGUI_PhleaMarket_Adm_Days": "%1d",
+  "IGUI_PhleaMarket_Adm_Ago": "%1 ago"
 }
