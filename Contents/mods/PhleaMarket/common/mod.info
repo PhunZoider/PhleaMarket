@@ -7,4 +7,5 @@ poster=poster.png
 icon=icon.png
 require=phunmart2
 versionMin=42.0.0
-pack=phleamarket 1425
+pack=phleamarket
+tiledef=phleamarket 1425

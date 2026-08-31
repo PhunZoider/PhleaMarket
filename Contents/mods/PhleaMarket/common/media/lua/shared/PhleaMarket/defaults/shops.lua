@@ -5,15 +5,8 @@
 -- shops PhunMart ships. Returned as a table keyed by shop name, matching the
 -- shape of PhunMart/defaults/shops.
 --
--- DISABLED until the tile pack exists. The sprite names below are what the
--- pack will provide and are not in any pack yet, so a machine placed now would
--- be an invisible object standing in the street. Flip `enabled` when the art
--- lands; nothing else here should need to change.
-
 return {
     PhleaMarket = {
-        enabled = false,
-
         probability = 5,
         minDistance = 500,
         category = "PhleaMarket",
@@ -30,9 +23,10 @@ return {
         -- forcing placement. This machine's stock comes from players.
         stocksNothing = true,
 
-        background = "machine-phlea-market.png",
+        background = "machine-phleamarket.png",
 
-        -- This mod's own pack, not PhunMart's. Borrowing phunmart_03_16..23
+        -- This mod's own pack, not PhunMart's (media/phleamarket.tiles, declared
+        -- by the tiledef line in mod.info). Borrowing phunmart_03_16..23
         -- would work at runtime -- sprite names are global once a pack loads --
         -- but it would mean the machine's art shipping from a repository this
         -- mod does not own, and the two having to be versioned together to
