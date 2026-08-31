@@ -95,7 +95,7 @@ end
 
 local Dialog = ISPanel:derive("PhleaMarketPriceDialog")
 
-local W, H = 320, 250
+local W, H = 320, 268
 
 function Dialog:new(x, y, window, row)
     local o = ISPanel:new(x, y, math.floor(W * FS), math.floor(H * FS))
@@ -136,7 +136,12 @@ function Dialog:createChildren()
     self.priceBox:setText(tostring(Market.lastAsk and Market.lastAsk[self.row.fullType] or
                                        Market.limits().minPrice))
     self:addChild(self.priceBox)
-    y = y + lineH + math.floor(6 * FS)
+
+    -- A line's worth of room under the box for the allowed range. A limit a
+    -- seller only discovers by being refused is a limit that should have been
+    -- on screen before they typed.
+    self.rangeY = y + lineH + math.floor(2 * FS)
+    y = y + lineH + FONT_SM + math.floor(8 * FS)
 
     -- Only offered for something where every one is interchangeable. A stack of
     -- axes cannot be listed as a stack, because the listing holds one snapshot
@@ -259,6 +264,33 @@ function Dialog:render()
     local commission = Listings.applyFee(Market.commissionRule(), total)
     local pool = "change"
 
+    -- The allowed range, said before it is enforced rather than after. Shown
+    -- only where there is a floor to speak of, since a minimum of zero is not
+    -- a rule worth taking up a line.
+    local limits = Market.limits()
+    local tooLow = price < (limits.minPrice or 0)
+    local tooHigh = price > (limits.maxPrice or math.huge)
+    if (limits.minPrice or 0) > 0 or tooHigh then
+        local text, r, g, b
+        if tooLow then
+            text = getText("IGUI_PhleaMarket_RangeTooLow", Market.formatAmount(pool, limits.minPrice))
+            r, g, b = 0.95, 0.45, 0.4
+        elseif tooHigh then
+            text = getText("IGUI_PhleaMarket_RangeTooHigh", Market.formatAmount(pool, limits.maxPrice))
+            r, g, b = 0.95, 0.45, 0.4
+        else
+            text = getText("IGUI_PhleaMarket_Range", Market.formatAmount(pool, limits.minPrice),
+                Market.formatAmount(pool, limits.maxPrice))
+            r, g, b = 0.55, 0.55, 0.55
+        end
+        self:drawText(text, pad, self.rangeY, r, g, b, 1, UIFont.Small)
+    end
+
+    -- Out of range cannot be listed, so the button says so by being dead. The
+    -- alternative is what shipped: let them press it, send it, and explain
+    -- afterwards.
+    self.okBtn:setEnable(not tooLow and not tooHigh and price > 0)
+
     -- Beside the box, because a seller typing 5 has no way to know whether they
     -- have asked for a nickel or five dollars until they see it written out.
     self:drawText(Market.formatAmount(pool, price), self.priceBox:getX() - math.floor(64 * FS),
@@ -281,6 +313,15 @@ end
 
 function Dialog:onOK()
     local price, qty = self:values()
+
+    -- The button is dead when the price is out of range, so this should not be
+    -- reachable. Checked anyway: the enable state is set in render, and a
+    -- dialog that has not drawn yet has never set it.
+    local limits = Market.limits()
+    if price <= 0 or price < (limits.minPrice or 0) or price > (limits.maxPrice or math.huge) then
+        return
+    end
+
     Client.send(C.list, {
         fullType = self.row.fullType,
         qty = qty,
