@@ -4,10 +4,10 @@ A Project Zomboid (B42) mod that adds a vending machine stocking itself from oth
 pockets. Hand it something, name a price, and it holds that item in escrow until somebody
 buys it or the clock runs out.
 
-> **Requires:** [PhunMart 2](https://github.com/PhunZoider/PhunMart). This mod does nothing on its own.
+> **Requires:** [PhunMart 2](https://steamcommunity.com/sharedfiles/filedetails/?id=3689006725). This mod does nothing on its own.
 > **Build:** Project Zomboid B42, singleplayer or multiplayer.
 
-![The machine](Contents/mods/PhleaMarket/common/media/textures/machine-phleamarket.png)
+![The machine](Docs/images/PhleaMarket_Sell.png)
 
 ---
 
@@ -84,14 +84,14 @@ it is there.
 Twenty two options on their own **Phlea Market** sandbox page. Every one carries a tooltip
 in game, so this is the shape of them rather than a list.
 
-| Group | What it controls |
-| --- | --- |
-| **Enable / Simulated sellers** | The master switch, and whether the market stocks itself with listings from survivors who do not exist. |
-| **Durations** | Three tiers (short, medium, long) in in game hours, each with its own listing fee multiplier. Set all three the same for a single fixed length. |
-| **Listing fee** | Charged when a listing goes up and never refunded. A percentage of the asking total or a flat amount, with an optional floor. |
-| **Commission** | Taken from the seller's proceeds on each sale. A percentage or a flat amount. This is the main currency sink. |
-| **Limits** | Listings per account, largest stack in one listing, and the price floor and ceiling. |
-| **Housekeeping** | How long uncollected returns survive, and how many entries the admin ledger keeps. |
+| Group                          | What it controls                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Enable / Simulated sellers** | The master switch, and whether the market stocks itself with listings from survivors who do not exist.                                          |
+| **Durations**                  | Three tiers (short, medium, long) in in game hours, each with its own listing fee multiplier. Set all three the same for a single fixed length. |
+| **Listing fee**                | Charged when a listing goes up and never refunded. A percentage of the asking total or a flat amount, with an optional floor.                   |
+| **Commission**                 | Taken from the seller's proceeds on each sale. A percentage or a flat amount. This is the main currency sink.                                   |
+| **Limits**                     | Listings per account, largest stack in one listing, and the price floor and ceiling.                                                            |
+| **Housekeeping**               | How long uncollected returns survive, and how many entries the admin ledger keeps.                                                              |
 
 Fees are worked out when a listing goes up and frozen onto it. A seller sees their exact
 take home before confirming, and changing a setting later cannot reach back and tax
@@ -150,32 +150,3 @@ listing, so the answer is already there when somebody asks.
 PhunMart currency, the dropped wallet, the vehicle key spawner and corpses are blocked
 outright. Server owners can block more by exact item type, by display category (so "no food"
 is one entry rather than hundreds) or by item tag.
-
----
-
-## Building it
-
-Requires a PhunMart 2 checkout beside this one, since the two are developed together:
-
-```
-d:\pz-dev\code\PhunMart2
-d:\pz-dev\code\PhleaMarket
-```
-
-```
-deploy.cmd
-```
-
-Copies to `%USERPROFILE%\Zomboid\mods\PhleaMarket`, a `PhleaMarketDev` variant carrying the
-`phleamarketdev` mod id so both can sit in one install, and both Workshop staging folders.
-PhunMart 2 has to be deployed and enabled alongside it.
-
-```
-Tests\lua\run.cmd
-```
-
-Runs the offline suites under LuaJIT. See [Tests/lua/README.md](Tests/lua/README.md).
-
-## Licence
-
-GPL-3.0. See [LICENSE](LICENSE).
