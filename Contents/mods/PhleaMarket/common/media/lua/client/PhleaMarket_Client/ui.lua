@@ -127,7 +127,15 @@ local function showNotices(payload)
         toast.show({
             text = text,
             duration = 6,
-            color = {0.4, 0.9, 0.5}
+            -- Named fields, not a positional triple. The toast reads color.r
+            -- and friends, and a positional table hands it three nils, which
+            -- surfaces as a NullPointerException inside the render loop rather
+            -- than anywhere near the call.
+            color = {
+                r = 0.4,
+                g = 0.9,
+                b = 0.5
+            }
         })
     else
         -- No toast to show it in is not a reason to swallow it.
