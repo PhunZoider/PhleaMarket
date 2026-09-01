@@ -59,10 +59,13 @@
   "Sandbox_PhleaMarket_MaxStackQty_tooltip": "Ceiling on how many of one item a single listing may hold. Only items where every one is interchangeable can be listed as a stack.",
 
   "Sandbox_PhleaMarket_MinPrice": "Minimum unit price",
-  "Sandbox_PhleaMarket_MinPrice_tooltip": "The least a seller may ask per item, in cents. Keep it aligned to five to match the rest of the change economy.",
+  "Sandbox_PhleaMarket_MinPrice_tooltip": "The least a seller may ask per item, in cents, so 500 is five dollars. Sellers type and read dollars; this is the stored figure. Raised onto the price step if it does not already sit on one.",
 
   "Sandbox_PhleaMarket_MaxPrice": "Maximum unit price",
-  "Sandbox_PhleaMarket_MaxPrice_tooltip": "The most a seller may ask per item, in cents. Stops a listing nobody could ever afford being used as free storage.",
+  "Sandbox_PhleaMarket_MaxPrice_tooltip": "The most a seller may ask per item, in cents, so 9999 is $99.99. Stops a listing nobody could ever afford being used as free storage. If you have scaled PhunMart's own prices up, raise this to match, or the market will not hold what your machines sell. Lowered onto the price step if it does not already sit on one.",
+
+  "Sandbox_PhleaMarket_PriceStep": "Price step",
+  "Sandbox_PhleaMarket_PriceStep_tooltip": "What a price must be a multiple of, in cents, so 100 is one dollar. Five keeps asking prices aligned to the rest of the change economy. A hundred means whole dollars and nothing finer, which is what you want if you have scaled PhunMart's own prices so the machines charge round figures. One allows any amount down to the cent. Anything typed between steps is brought down to the one below it, the minimum and maximum unit price are aligned to it so the range only ever names prices a listing may actually hold, and the simulated sellers price themselves the same way.",
 
   "Sandbox_PhleaMarket_ReturnsExpiryHours": "Uncollected returns, hours",
   "Sandbox_PhleaMarket_ReturnsExpiryHours_tooltip": "How long an expired item waits to be collected before it is discarded, in in-game hours. Without a limit the save carries every abandoned listing forever.",

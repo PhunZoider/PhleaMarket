@@ -187,9 +187,11 @@ function Simulated.addOne(store, now)
 
     local spread = 65 + ZombRand(86) -- 65% to 150%
     local unit = math.floor(choice.base * spread / 100)
-    -- Nickel-aligned, because the rest of the change economy is and a price of
-    -- 37 cents in among prices ending in 0 and 5 reads as a bug.
-    unit = math.floor(unit / 5) * 5
+    -- Aligned to the step every real seller is held to, because the whole point
+    -- of these is to be indistinguishable from listings players made. A price
+    -- of 37 cents in among prices ending in 0 and 5 reads as a bug, and a price
+    -- of $12.37 on a server priced in whole dollars reads as a worse one.
+    unit = Market.snapPrice(unit, limits.step)
     if unit < limits.minPrice then
         unit = limits.minPrice
     end

@@ -153,6 +153,86 @@ do
     ok("and none of it created anything", countActive(store) == 0)
 end
 
+print("-- the price step --")
+do
+    local store = L.newStore()
+    -- A step of a hundred is the whole-dollar case: cents are not a figure
+    -- anybody may name, and what is typed comes down to the dollar below it.
+    local whole = {
+        minPrice = 100,
+        maxPrice = 10000,
+        step = 100
+    }
+    local listing = list(store, {
+        amount = 1237,
+        limits = whole
+    })
+    ok("a price between steps comes down to the one below", listing and listing.unitPrice.amount == 1200,
+        listing and tostring(listing.unitPrice.amount))
+
+    listing = list(store, {
+        amount = 1200,
+        limits = whole
+    })
+    ok("a price already on a step is untouched", listing and listing.unitPrice.amount == 1200)
+
+    local _, why = list(store, {
+        amount = 99,
+        limits = whole
+    })
+    ok("one below the floor is refused", why == "PriceTooLow", tostring(why))
+
+    -- Snapping happens before the range is judged. Against an unaligned floor
+    -- the order is the whole of the difference: 170 clears a floor of 150 and
+    -- then snaps to 100, which does not. Judging the figure that will be stored
+    -- rather than the one that was typed is what keeps a listing off the shelf
+    -- at a price the floor forbids.
+    --
+    -- Market.limits raises the floor onto the step before any of this, so a
+    -- server never presents an unaligned one. A caller still may, and the
+    -- refusal is the right answer when it does.
+    _, why = list(store, {
+        amount = 170,
+        limits = {
+            minPrice = 150,
+            maxPrice = 10000,
+            step = 100
+        }
+    })
+    ok("and one that only clears an unaligned floor before snapping is refused", why == "PriceTooLow", tostring(why))
+
+    -- The ceiling is aligned by Market.limits before it ever reaches here, so
+    -- snapping can only move a price away from it, never through it.
+    listing = list(store, {
+        amount = 10000,
+        limits = whole
+    })
+    ok("the ceiling itself is still listable", listing and listing.unitPrice.amount == 10000)
+
+    -- A step of one is every amount, which is the shipped behaviour and what a
+    -- caller that says nothing about a step gets.
+    listing = list(store, {
+        amount = 1237,
+        limits = {
+            step = 1
+        }
+    })
+    ok("a step of one leaves the price alone", listing and listing.unitPrice.amount == 1237)
+
+    listing = list(store, {
+        amount = 1237
+    })
+    ok("and so does saying nothing about a step at all", listing and listing.unitPrice.amount == 1237)
+
+    listing = list(store, {
+        amount = 37,
+        limits = {
+            step = 5
+        }
+    })
+    ok("a nickel step aligns to five", listing and listing.unitPrice.amount == 35)
+end
+
 print("-- the listing limit is per account --")
 do
     local store = L.newStore()

@@ -65,6 +65,12 @@ Commands[C.list] = function(playerObj, args)
     local hours = Store.duration(args.duration)
     local limits = Store.limits()
 
+    -- Snapped to the step here, before the fee is worked out on it. Listings
+    -- snaps again when it creates the record, but the fee is charged from this
+    -- side beforehand, and charging a percentage of a figure the listing does
+    -- not go on to carry is how the dialog's total and the receipt disagree.
+    price = Market.snapPrice(price, limits.step)
+
     -- Bounded here as well as in the dialog. The client clamps what it sends,
     -- but the client is not the authority on anything: a number arriving from
     -- it is a request, and the only figures that matter are the ones this side
@@ -400,6 +406,9 @@ Commands[C.relist] = function(playerObj, args)
     local hours = Store.duration(args.duration)
     local price = math.floor(tonumber(args.unitPrice) or (entry.unitPrice and entry.unitPrice.amount) or 0)
     local limits = Store.limits()
+    -- Snapped as a new listing is, since the price carried over from the return
+    -- was set under whatever the step was then, and the step may have moved.
+    price = Market.snapPrice(price, limits.step)
     if price < limits.minPrice or price > limits.maxPrice then
         return fail(playerObj, "BadPrice")
     end

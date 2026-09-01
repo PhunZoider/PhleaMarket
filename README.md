@@ -34,6 +34,10 @@ an `@` searches sellers instead, so `@steve` finds everything Steve has up.
 Everything in your bags that may be listed, one row per kind of item. Pick one, name a price
 per item, choose how many and how long to list it for.
 
+**The price is in dollars,** the same as every figure the game shows you: type `105` for
+$105, or `12.50` for twelve fifty. The amount beside the box is what the price will actually
+be, and the line under it says the range and the smallest step you may move in.
+
 The dialog shows what the market is currently asking for that item, what it has recently
 sold for, and what you asked last time you listed one. It opens at that last price. It also
 shows the listing fee and what lands in your wallet if the lot sells, worked out with the
@@ -81,7 +85,7 @@ it is there.
 
 ### Settings
 
-Twenty two options on their own **Phlea Market** sandbox page. Every one carries a tooltip
+Twenty three options on their own **Phlea Market** sandbox page. Every one carries a tooltip
 in game, so this is the shape of them rather than a list.
 
 | Group                          | What it controls                                                                                                                                |
@@ -90,7 +94,7 @@ in game, so this is the shape of them rather than a list.
 | **Durations**                  | Three tiers (short, medium, long) in in game hours, each with its own listing fee multiplier. Set all three the same for a single fixed length. |
 | **Listing fee**                | Charged when a listing goes up and never refunded. A percentage of the asking total or a flat amount, with an optional floor.                   |
 | **Commission**                 | Taken from the seller's proceeds on each sale. A percentage or a flat amount. This is the main currency sink.                                   |
-| **Limits**                     | Listings per account, largest stack in one listing, and the price floor and ceiling.                                                            |
+| **Limits**                     | Listings per account, largest stack in one listing, the price floor and ceiling, and the step a price must be a multiple of.                    |
 | **Housekeeping**               | How long uncollected returns survive, and how many entries the admin ledger keeps.                                                              |
 
 Fees are worked out when a listing goes up and frozen onto it. A seller sees their exact
@@ -114,6 +118,23 @@ set against that ceiling holding.
 
 **Price limits stop the market being used as storage.** A listing nobody can afford is a
 free bank vault, and the ceiling plus a percentage listing fee makes that expensive.
+
+**Every price setting here is counted in cents,** because the change pool is. The floor, the
+ceiling, the step, both fixed fees and the fee floor are all raw pool units: a ceiling of
+9999 is $99.99. Players never see that unit -- they type and read dollars, the way they do
+everywhere else in PhunMart -- but you are setting the stored figure, so it is worth saying
+which one you are looking at.
+
+If you have scaled PhunMart's own prices so its machines charge in the hundreds of dollars,
+these defaults are the first thing to move, and the ceiling is the urgent one. A market that
+cannot list what the machines sell is a market nobody uses.
+
+**The price step decides how fine a price may be.** Five, the default, keeps asking prices
+nickel aligned the way the rest of the change economy is. Set it to 100 on a server priced
+in whole dollars and nobody can ask $12.37: anything typed between steps comes down to the
+dollar below it, the floor and ceiling are aligned to the step so the range never names a
+price a listing could not hold, and the simulated sellers price themselves the same way.
+One allows any amount down to the cent.
 
 ### Simulated sellers
 

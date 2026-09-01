@@ -135,12 +135,72 @@ function Market.listingFeeRule()
     }
 end
 
+--- The coarseness a price may be named at, in pool units.
+---
+--- A market counted in cents lets somebody ask $12.37, which on a server whose
+--- machines all charge round figures reads as a mistake rather than as a keen
+--- price. One allows every amount; five keeps the change economy nickel-aligned
+--- the way the rest of it already is; a hundred means whole dollars and nothing
+--- finer, which is what a server that has scaled PhunMart's prices up wants.
+function Market.priceStep()
+    local step = math.floor(tonumber(Market.getOption("PriceStep", 5)) or 1)
+    if step < 1 then
+        return 1
+    end
+    return step
+end
+
+--- An amount brought down onto the step below it.
+---
+--- Down rather than to the nearest, so snapping never quietly asks a buyer for
+--- more than the figure the seller typed. Nothing here puts the floor back:
+--- callers check the range afterwards, and a price that snaps under the
+--- minimum is a price that was under it, which is worth being told about
+--- rather than silently corrected upwards.
+function Market.snapPrice(amount, step)
+    amount = math.floor(tonumber(amount) or 0)
+    step = step or Market.priceStep()
+    if step <= 1 then
+        return amount
+    end
+    return math.floor(amount / step) * step
+end
+
 function Market.limits()
+    local step = Market.priceStep()
+    local minPrice = Market.getOption("MinPrice", 5)
+    local maxPrice = Market.getOption("MaxPrice", 9999)
+
+    -- The bounds are aligned to the step as well, because a range whose ends
+    -- are not themselves listable is a range that lies: a floor of 5 under a
+    -- step of 100 names a price no listing may ever hold. The floor goes up and
+    -- the ceiling comes down, so everything the range describes is a price that
+    -- can actually be asked.
+    --
+    -- Moving them can collide -- a ceiling of 50 under a step of 100 rounds
+    -- down to nothing, and the aligned floor is already above it. The ceiling
+    -- is opened back up to the floor rather than left underneath it, which is
+    -- above the figure that was set. An admin who has asked for a step coarser
+    -- than their own ceiling has asked for two things that cannot both hold,
+    -- and one listable price is a better answer than a market where the sell
+    -- button never lights up and the range line explains why.
+    if step > 1 then
+        minPrice = math.ceil(minPrice / step) * step
+        maxPrice = math.floor(maxPrice / step) * step
+        if minPrice < step then
+            minPrice = step
+        end
+        if maxPrice < minPrice then
+            maxPrice = minPrice
+        end
+    end
+
     return {
         maxListings = Market.getOption("MaxListings", 10),
         maxQty = Market.getOption("MaxStackQty", 100),
-        minPrice = Market.getOption("MinPrice", 5),
-        maxPrice = Market.getOption("MaxPrice", 9999)
+        minPrice = minPrice,
+        maxPrice = maxPrice,
+        step = step
     }
 end
 
@@ -154,10 +214,21 @@ end
 --- change is counted in cents and reads as $0.05, tokens are counted in tokens
 --- and read as 5. Showing the raw number leaves a seller typing 5 and having no
 --- idea whether they have asked for a nickel or five dollars.
+--- Whether a pool is counted in something finer than the unit it is spoken in.
+---
+--- The change pool is: it is counted in cents and spoken in dollars, so a
+--- balance of 500 is five dollars. Tokens are counted and spoken in tokens.
+--- Everything that puts money on screen or takes it off a keyboard turns on
+--- this one question.
+function Market.isSubunitPool(pool)
+    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
+    return def ~= nil and def.format == "cents"
+end
+local isSubunit = Market.isSubunitPool
+
 function Market.formatAmount(pool, amount)
     amount = tonumber(amount) or 0
-    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
-    if def and def.format == "cents" then
+    if isSubunit(pool) then
         -- The shared formatter lives in a client-only module, so this does the
         -- same arithmetic rather than reaching across for it.
         local sign = amount < 0 and "-" or ""
@@ -165,6 +236,49 @@ function Market.formatAmount(pool, amount)
         return string.format("%s$%d.%02d", sign, math.floor(n / 100), n % 100)
     end
     return tostring(math.floor(amount))
+end
+
+--- A figure somebody typed, as a number of pool units.
+---
+--- The price box is the only place in the market where anybody types money, and
+--- it used to take raw pool units. On the change pool that means cents, so a
+--- seller who meant a hundred dollars typed 100 and listed at one. Nothing else
+--- in PhunMart asks that of a player -- every balance, price and fee they are
+--- shown is written out in dollars -- which made this the single screen wanting
+--- a unit the rest of the game never puts in front of them, and there is no
+--- reading of "105" that warns you it meant a dollar five.
+---
+--- So it takes dollars, and converts here. This is deliberately the same
+--- arithmetic as PhunMart's own wallet editor, which has always taken dollars
+--- for a cents pool: the two ought not to disagree about what a typed number
+--- means.
+---
+--- Returns nil for anything that is not a number, which the caller shows as a
+--- price of nothing rather than guessing at.
+function Market.parseAmount(pool, text)
+    local num = tonumber(text)
+    if not num or num < 0 then
+        return nil
+    end
+    if isSubunit(pool) then
+        -- Rounded rather than truncated: 12.37 arrives as 1236.9999... and a
+        -- floor would quietly take a cent off every price with an odd one.
+        return math.floor(num * 100 + 0.5)
+    end
+    return math.floor(num)
+end
+
+--- The inverse: an amount as the text an entry box should open holding.
+---
+--- Bare digits rather than formatAmount's "$1.05", because this goes straight
+--- back into a box the player edits, and a currency symbol is something they
+--- would have to type around.
+function Market.amountToText(pool, amount)
+    amount = math.floor(tonumber(amount) or 0)
+    if isSubunit(pool) then
+        return string.format("%.2f", amount / 100)
+    end
+    return tostring(amount)
 end
 
 --- What listing something actually costs, all in.

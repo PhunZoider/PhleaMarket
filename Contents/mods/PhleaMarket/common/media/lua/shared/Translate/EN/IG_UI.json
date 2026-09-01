@@ -34,6 +34,7 @@
   "IGUI_PhleaMarket_ListTitle": "Sell %1",
   "IGUI_PhleaMarket_UnitPrice": "Price each",
   "IGUI_PhleaMarket_Range": "Between %1 and %2",
+  "IGUI_PhleaMarket_RangeStep": "Between %1 and %2, in steps of %3",
   "IGUI_PhleaMarket_RangeTooLow": "Too low. The least you may ask is %1",
   "IGUI_PhleaMarket_RangeTooHigh": "Too high. The most you may ask is %1",
   "IGUI_PhleaMarket_Quantity": "How many (of %1)",

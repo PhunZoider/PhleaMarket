@@ -109,10 +109,39 @@ function harness.installGlobals()
 
     _G.getTextOrNull = function() return nil end
     _G.getText = function(k) return k end
+
+    -- Sandbox options, shaped the way the game hands them over: a lookup by
+    -- full name returning an object you ask for a value, not a plain table.
+    -- Mod code reads them through that shape, so a test that set a flat table
+    -- would be testing something the game does not do.
+    --
+    -- harness.sandbox is the table to write. Anything absent reads as nil,
+    -- which is what an option a build does not have does, and is how a default
+    -- gets exercised.
+    _G.getSandboxOptions = function()
+        return {
+            getOptionByName = function(_, name)
+                local value = harness.sandbox[name]
+                if value == nil then
+                    return nil
+                end
+                return {
+                    getValue = function()
+                        return value
+                    end
+                }
+            end
+        }
+    end
 end
+
+--- What getSandboxOptions above will answer with. Keyed by the full option
+--- name, "PhleaMarket.MinPrice" and so on.
+harness.sandbox = {}
 
 function harness.reset()
     harness.files = {}
+    harness.sandbox = {}
 end
 
 ---------------------------------------------------------------------------

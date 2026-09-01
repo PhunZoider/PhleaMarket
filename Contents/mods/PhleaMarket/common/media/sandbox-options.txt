@@ -194,6 +194,16 @@ option PhleaMarket.MaxPrice
     translation = PhleaMarket_MaxPrice,
 }
 
+option PhleaMarket.PriceStep
+{
+    type = integer,
+    default = 5,
+    min = 1,
+    max = 100000,
+    page = PhleaMarket,
+    translation = PhleaMarket_PriceStep,
+}
+
 option PhleaMarket.ReturnsExpiryHours
 {
     type = integer,

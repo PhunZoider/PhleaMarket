@@ -184,6 +184,12 @@ function Dialog:new(x, y, window, row)
         a = 1
     }
     o.duration = "medium"
+    -- Everything listed is priced in change. Named once rather than repeated at
+    -- each of the places that ask the pool how to say a figure or how to read
+    -- one, since the day a second pool is listable they all have to move
+    -- together or the dialog starts writing prices in one unit and reading them
+    -- in another.
+    o.pool = "change"
     return o
 end
 
@@ -197,12 +203,21 @@ function Dialog:createChildren()
     self.priceBox = ISTextEntryBox:new("", self.width - pad - boxW, y, boxW, lineH)
     self.priceBox:initialise()
     self.priceBox:instantiate()
-    self.priceBox:setOnlyNumbers(true)
+    -- Digits only would be right if the box took cents. It takes dollars, and
+    -- a dollar figure needs its point: setOnlyNumbers would swallow the key and
+    -- leave a seller unable to type 12.50 at all. Anything unparseable comes
+    -- back as a price of nothing, which the dead OK button already covers.
+    if not Market.isSubunitPool(self.pool) then
+        self.priceBox:setOnlyNumbers(true)
+    end
     -- Opens at the floor, and moves to what this account asked for one of these
     -- last time once the server says. That answer cannot be here yet -- it is
     -- still in flight when the dialog is built -- so render applies it, and only
     -- while the box still holds this untouched starting value.
-    self._initialText = tostring(Market.lastAsk and Market.lastAsk[self.row.fullType] or Market.limits().minPrice)
+    -- Snapped, because a remembered ask was named under whatever the step was
+    -- at the time and the box should never open on a price it would refuse.
+    self._initialText = Market.amountToText(self.pool, math.max(Market.limits().minPrice,
+        Market.snapPrice(Market.lastAsk and Market.lastAsk[self.row.fullType] or Market.limits().minPrice)))
     self.priceBox:setText(self._initialText)
     self:addChild(self.priceBox)
 
@@ -297,7 +312,11 @@ function Dialog:paintDuration()
 end
 
 function Dialog:values()
-    local price = tonumber(self.priceBox:getInternalText()) or 0
+    -- Read as dollars and converted to the pool's own units, which is what the
+    -- rest of this function, the server and the listing all deal in. Everything
+    -- below this line is cents on a change pool; everything the player types or
+    -- reads is dollars.
+    local price = Market.parseAmount(self.pool, self.priceBox:getInternalText()) or 0
     local qty = self.qtyBox and (tonumber(self.qtyBox:getInternalText()) or 1) or 1
     if qty < 1 then
         qty = 1
@@ -305,7 +324,18 @@ function Dialog:values()
     if qty > self.row.count then
         qty = self.row.count
     end
-    return math.floor(price), math.floor(qty)
+    -- Snapped to the step the server will snap it to, so the total, the fee and
+    -- the take-home shown below are all worked out from the price that will
+    -- actually be listed.
+    --
+    -- The box is deliberately left holding what was typed rather than being
+    -- rewritten the way the quantity is. Snapping fires on every keystroke, so
+    -- correcting it in place would eat digits as they arrived: under a whole
+    -- dollar step, typing the 5 of 12.50 would rewrite the box to 12.00 and
+    -- take the keyboard off the player mid-figure. The amount written out
+    -- beside the box says what the price really is, and the range line
+    -- underneath says the rule before a key is pressed.
+    return Market.snapPrice(price), math.floor(qty)
 end
 
 function Dialog:render()
@@ -345,7 +375,7 @@ function Dialog:render()
     local total = price * qty
     local fee = Market.listingFeeFor(total, self.duration)
     local commission = Listings.applyFee(Market.commissionRule(), total)
-    local pool = "change"
+    local pool = self.pool
 
     -- The allowed range, said before it is enforced rather than after. Shown
     -- only where there is a floor to speak of, since a minimum of zero is not
@@ -361,6 +391,12 @@ function Dialog:render()
         elseif tooHigh then
             text = getText("IGUI_PhleaMarket_RangeTooHigh", Market.formatAmount(pool, limits.maxPrice))
             r, g, b = 0.95, 0.45, 0.4
+        elseif (limits.step or 1) > 1 then
+            -- The step is said here rather than left to be discovered by typing
+            -- a figure and watching it change into a different one.
+            text = getText("IGUI_PhleaMarket_RangeStep", Market.formatAmount(pool, limits.minPrice),
+                Market.formatAmount(pool, limits.maxPrice), Market.formatAmount(pool, limits.step))
+            r, g, b = 0.55, 0.55, 0.55
         else
             text = getText("IGUI_PhleaMarket_Range", Market.formatAmount(pool, limits.minPrice),
                 Market.formatAmount(pool, limits.maxPrice))
@@ -374,8 +410,10 @@ function Dialog:render()
     -- afterwards.
     self.okBtn:setEnable(not tooLow and not tooHigh and price > 0)
 
-    -- Beside the box, because a seller typing 5 has no way to know whether they
-    -- have asked for a nickel or five dollars until they see it written out.
+    -- Beside the box, saying what the price will actually be. The box takes
+    -- dollars, so this is no longer translating a unit at the player; it is
+    -- what confirms the step, since a figure typed between steps comes down and
+    -- this is where that is visible.
     self:drawText(Market.formatAmount(pool, price), self.priceBox:getX() - math.floor(64 * FS),
         priceY + math.floor(4 * FS), 0.6, 0.85, 0.6, 1, UIFont.Small)
 
@@ -406,7 +444,8 @@ function Dialog:render()
         if info.lastAsk and not self._prefilled then
             self._prefilled = true
             if self.priceBox:getInternalText() == self._initialText then
-                self.priceBox:setText(tostring(info.lastAsk))
+                self.priceBox:setText(Market.amountToText(pool,
+                    math.max(limits.minPrice, Market.snapPrice(info.lastAsk))))
             end
         end
 

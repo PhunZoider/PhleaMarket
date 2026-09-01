@@ -227,7 +227,7 @@ end
 ---   listingFee           already charged by the caller, recorded here
 ---   commission           {mode=, percent=, fixed=} frozen for this listing
 ---   nowHours             world age
----   limits               {maxListings=, minPrice=, maxPrice=, maxQty=}
+---   limits               {maxListings=, minPrice=, maxPrice=, maxQty=, step=}
 ---
 --- Returns the listing, or nil plus a reason. Nothing is changed on failure.
 function Listings.create(store, params)
@@ -249,7 +249,16 @@ function Listings.create(store, params)
     if type(price) ~= "table" or type(price.amount) ~= "number" then
         return nil, "NoPrice"
     end
+    -- Snapped before the range is checked rather than after, so the figure the
+    -- bounds are judged against is the figure the listing will actually carry.
+    -- Snapping afterwards would let a price pass the floor and then be rounded
+    -- under it. limits carries the step already aligned to those bounds, so an
+    -- amount that survives this is listable as it stands.
     local amount = math.floor(price.amount)
+    local step = math.floor(tonumber(limits.step) or 1)
+    if step > 1 then
+        amount = math.floor(amount / step) * step
+    end
     if limits.minPrice and amount < limits.minPrice then
         return nil, "PriceTooLow"
     end
