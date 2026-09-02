@@ -10,7 +10,7 @@ return {
         probability = 5,
         minDistance = 500,
         category = "PhleaMarket",
-        powered = true,
+        powered = false,
 
         -- Read by the shop window's mode registry to decide whether the Sell,
         -- Mine and Returns modes belong on this machine. Survives compilation
