@@ -202,7 +202,7 @@ function UI:refreshList()
 
     for _, listing in ipairs(self.listings or {}) do
         local unit = listing.unitPrice and listing.unitPrice.amount or 0
-        local pool = listing.unitPrice and listing.unitPrice.pool or "change"
+        local pool = listing.unitPrice and listing.unitPrice.pool or Market.currencyPool()
         self:addListItem(listing.itemName or listing.fullType, {
             kind = "listing",
             key = listing.id,
@@ -240,7 +240,7 @@ function UI:refreshList()
             event = entry.event,
             fullType = entry.item,
             qtyText = entry.qty and tostring(entry.qty) or "",
-            priceText = amount and Market.formatAmount("change", amount) or "",
+            priceText = amount and Market.formatAmount(Market.currencyPool(), amount) or "",
             whenText = relativeHours(entry.at),
             qtyValue = entry.qty or 0,
             priceValue = amount or 0,

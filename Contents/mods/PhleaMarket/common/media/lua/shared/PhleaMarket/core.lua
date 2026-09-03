@@ -171,6 +171,25 @@ function Market.limits()
     local minPrice = Market.getOption("MinPrice", 5)
     local maxPrice = Market.getOption("MaxPrice", 9999)
 
+    -- On an item currency these three are read as whole items rather than as
+    -- ledger units. One rule, and the one an admin means: a MinPrice of 5 is
+    -- five of the thing, the same way it is five cents on the change pool.
+    -- Left unscaled they are hundredths, and a floor of five hundredths, a
+    -- ceiling of ninety nine and a step of nothing is what the range line was
+    -- reporting.
+    --
+    -- The step is held at one whole item at the least. Half an item is not a
+    -- price a seller can name -- parseAmount truncates before it gets here --
+    -- so a finer step only lets the simulated sellers quote a figure the buy
+    -- path would then round up on, which shows a player one number and charges
+    -- them another.
+    if Market.poolItem(Market.currencyPool()) then
+        local scale = Market.ITEM_SCALE
+        minPrice = math.max(scale, math.floor(minPrice) * scale)
+        maxPrice = math.max(minPrice, math.floor(maxPrice) * scale)
+        step = math.max(scale, math.floor(step) * scale)
+    end
+
     -- The bounds are aligned to the step as well, because a range whose ends
     -- are not themselves listable is a range that lies: a floor of 5 under a
     -- step of 100 names a price no listing may ever hold. The floor goes up and
@@ -204,8 +223,130 @@ function Market.limits()
     }
 end
 
+--- The pool a listing fee and a commission are taken in.
+---
+--- Follows the market's currency unless an admin has named something else. A
+--- server that has moved to an item currency has usually turned the change pool
+--- off, and a fee charged in a pool nobody is filling is a fee that refuses
+--- every listing on the server.
+---
+--- Naming a pool explicitly still wins. Charging fees in tokens while the goods
+--- trade in items is a deliberate arrangement, and the option is here to let an
+--- admin set it up.
 function Market.feePool()
-    return Market.getOption("FeePool", "change")
+    local configured = Market.getOption("FeePool", "change")
+    if configured == nil or configured == "" or configured == "change" then
+        return Market.currencyPool()
+    end
+    return configured
+end
+
+--- The ledger units in one whole item of an item currency.
+---
+--- Prices are named in whole items, but commission is a share of one, and a
+--- fifth of an item is a real amount that has to survive until there is enough
+--- of it to pay. So an item pool is counted in hundredths the way change is
+--- counted in cents, and only becomes items again at the two points it has to
+--- be physical: taken out of a bag, or put into one.
+Market.ITEM_SCALE = 100
+
+--- An item pool is written "item:Base.Money" rather than carried beside the
+--- pool as a second field. The pool string is already stamped on every listing
+--- and already threaded through quote, sale and return, so putting the item
+--- inside it means none of that plumbing has to learn a new shape. Only the few
+--- places that actually touch money have to ask what kind of pool they have.
+Market.ITEM_POOL_PREFIX = "item:"
+
+--- The item an item-backed pool pays in, or nil for an ordinary wallet pool.
+function Market.poolItem(pool)
+    if type(pool) ~= "string" then
+        return nil
+    end
+    return pool:match("^item:(.+)$")
+end
+
+--- The pool the market prices in as things stand.
+---
+--- PhunMart owns what money is; this only asks it. `currency_base` is the one
+--- place a server's currency is configured, so there is nothing here to keep in
+--- step with it and nothing for an admin to set twice.
+---
+--- Guarded, because a PhunMart older than currencyDef is a PhunMart whose
+--- currency cannot be anything but change.
+function Market.currencyPool()
+    local def = Core.currencyDef and Core.currencyDef()
+    if not def then
+        return "change"
+    end
+    if def.kind == "items" and def.item then
+        return Market.ITEM_POOL_PREFIX .. def.item
+    end
+    return def.pool or "change"
+end
+
+--- What to call one of them on screen.
+---
+--- Through the script manager rather than the raw id, so a listing reads
+--- "5 Money" and not "5 Base.Money". Falls back to the half after the dot,
+--- which is what is left if the type has no script loaded.
+function Market.poolItemLabel(item)
+    if not item then
+        return ""
+    end
+    local ok, name = pcall(function()
+        local si = getScriptManager():getItem(item)
+        return si and si:getDisplayName() or nil
+    end)
+    if ok and name then
+        return name
+    end
+    return item:match("%.(.+)$") or item
+end
+
+--- Whether a pool is counted in something finer than the unit it is spoken in.
+---
+--- The change pool is: it is counted in cents and spoken in dollars, so a
+--- balance of 500 is five dollars. Tokens are counted and spoken in tokens.
+--- Everything that puts money on screen or takes it off a keyboard turns on
+--- this one question.
+---
+--- An item pool is stored finer than it is spoken too, and still answers no,
+--- because what this actually decides is whether a figure is written and typed
+--- with a decimal point. Half an item is not a price anybody may name: the
+--- fractions an item pool carries are made by commission, never by a seller.
+function Market.isSubunitPool(pool)
+    if Market.poolItem(pool) then
+        return false
+    end
+    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
+    return def ~= nil and def.format == "cents"
+end
+local isSubunit = Market.isSubunitPool
+
+--- How many ledger units make up one of whatever the pool is spoken in.
+function Market.poolScale(pool)
+    if Market.poolItem(pool) then
+        return Market.ITEM_SCALE
+    end
+    return isSubunit(pool) and 100 or 1
+end
+
+--- What a player could pay out of a pool right now, in that pool's units.
+---
+--- Shared, because the window greys a Buy button with it and the server
+--- refuses the purchase with it, and those two disagreeing is a button that
+--- does nothing when pressed. An item pool has no wallet balance to read:
+--- what a player has is what is in their bags.
+function Market.balanceOf(playerObj, pool)
+    local item = Market.poolItem(pool)
+    if item then
+        local inv = playerObj and playerObj.getInventory and playerObj:getInventory()
+        if not inv then
+            return 0
+        end
+        return (inv:getItemCountRecurse(item) or 0) * Market.ITEM_SCALE
+    end
+    return (Core.wallet and Core.wallet:getBalance(playerObj, pool)) or 0
 end
 
 --- An amount in the words of the pool it belongs to.
@@ -214,20 +355,16 @@ end
 --- change is counted in cents and reads as $0.05, tokens are counted in tokens
 --- and read as 5. Showing the raw number leaves a seller typing 5 and having no
 --- idea whether they have asked for a nickel or five dollars.
---- Whether a pool is counted in something finer than the unit it is spoken in.
----
---- The change pool is: it is counted in cents and spoken in dollars, so a
---- balance of 500 is five dollars. Tokens are counted and spoken in tokens.
---- Everything that puts money on screen or takes it off a keyboard turns on
---- this one question.
-function Market.isSubunitPool(pool)
-    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool or "change"]
-    return def ~= nil and def.format == "cents"
-end
-local isSubunit = Market.isSubunitPool
-
 function Market.formatAmount(pool, amount)
     amount = tonumber(amount) or 0
+    local item = Market.poolItem(pool)
+    if item then
+        -- Floored, so a balance never reads as more than it could pay out. What
+        -- the floor drops is not lost, it is only not collectable yet.
+        local sign = amount < 0 and "-" or ""
+        local n = math.floor(math.abs(amount) / Market.ITEM_SCALE)
+        return sign .. tostring(n) .. " " .. Market.poolItemLabel(item)
+    end
     if isSubunit(pool) then
         -- The shared formatter lives in a client-only module, so this does the
         -- same arithmetic rather than reaching across for it.
@@ -260,6 +397,12 @@ function Market.parseAmount(pool, text)
     if not num or num < 0 then
         return nil
     end
+    if Market.poolItem(pool) then
+        -- Whole items only. Somebody naming three and a half of something has
+        -- named a price the market cannot take out of a bag, and truncating is
+        -- the reading that never charges a buyer more than was asked.
+        return math.floor(num) * Market.ITEM_SCALE
+    end
     if isSubunit(pool) then
         -- Rounded rather than truncated: 12.37 arrives as 1236.9999... and a
         -- floor would quietly take a cent off every price with an odd one.
@@ -275,6 +418,9 @@ end
 --- would have to type around.
 function Market.amountToText(pool, amount)
     amount = math.floor(tonumber(amount) or 0)
+    if Market.poolItem(pool) then
+        return tostring(math.floor(amount / Market.ITEM_SCALE))
+    end
     if isSubunit(pool) then
         return string.format("%.2f", amount / 100)
     end
@@ -302,7 +448,9 @@ function Market.listingFeeFor(askingTotal, duration)
         return 0
     end
 
-    local fee = Listings.applyFee(rule, askingTotal) * mult
+    -- Unrounded, so the duration multiplier scales the real fraction rather
+    -- than what is left of it after a floor. Rounded once at the end.
+    local fee = Listings.feeValue(rule, askingTotal) * mult
     local floor = Market.getOption("ListingFeeMin", 0)
     if floor > 0 and fee < floor then
         fee = floor

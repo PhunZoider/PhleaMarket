@@ -84,9 +84,13 @@ local reported
 --- an admin has priced a hammer at, that is roughly what a hammer goes for
 --- here, including on a server that has rewritten every price in the game.
 ---
---- Only currency offers in the fee pool, and only real items. An offer priced
---- in items, or one that hands over a trait or a vehicle, is not something a
---- survivor can be pictured carrying to a market stall.
+--- Only offers priced in whatever the market itself trades in, and only real
+--- items. One that hands over a trait or a vehicle, or asks for some other item
+--- entirely, is not something a survivor can be pictured carrying to a stall.
+---
+--- This used to insist on kind="currency", which is every price on a change
+--- server and none at all on one paying in items: the fake market simply
+--- stopped appearing, with the count below reporting the nothing it had found.
 function Simulated.candidates()
     -- Only a list with something in it counts as cached.
     --
@@ -99,26 +103,62 @@ function Simulated.candidates()
         return candidates
     end
     candidates = {}
-    local pool = Market.feePool()
+    local pool = Market.currencyPool()
+    local currencyItem = Market.poolItem(pool)
+
+    --- What an offer costs, in the market's own units, or nil if it is not a
+    --- thing this market can quote at all.
+    ---
+    --- The two currencies read from different shapes. On the change pool a
+    --- machine's price is kind="currency" and already in the right units. On an
+    --- item currency it is kind="items" naming that same item, and the count is
+    --- whole items, so it is scaled into the hundredths the ledger counts in.
+    ---
+    --- Anything else is skipped: a barter basket, a price in some other item, a
+    --- trait, a vehicle. None of them is a figure to hang on a market stall.
+    local function costOf(price)
+        if type(price) ~= "table" then
+            return nil
+        end
+        local raw
+        if currencyItem then
+            if price.kind ~= "items" then
+                return nil
+            end
+            local lines = price.items
+            if type(lines) ~= "table" or #lines ~= 1 or lines[1].item ~= currencyItem then
+                return nil
+            end
+            raw = lines[1].amount or price.amount
+        else
+            if price.kind ~= "currency" or (price.pool or pool) ~= pool then
+                return nil
+            end
+            raw = price.amount
+        end
+
+        if type(raw) == "table" then
+            -- A price range compiles to one at restock; here the middle of it
+            -- is the honest reading of "what this costs".
+            raw = math.floor(((raw.min or 0) + (raw.max or raw.min or 0)) / 2)
+        end
+        if type(raw) ~= "number" or raw <= 0 then
+            return nil
+        end
+        return math.floor(raw) * (currencyItem and Market.ITEM_SCALE or 1)
+    end
 
     for _, poolDef in pairs((Core.runtime and Core.runtime.pools) or {}) do
         for _, offer in pairs(poolDef.offers or {}) do
             local item = offer.item
-            local price = offer.price
             -- A dot means a real item type. Traits, skills and boosts use bare
             -- keys, and none of them is a thing to find on a market stall.
-            if type(item) == "string" and item:find("%.") and type(price) == "table" and price.kind == "currency" and
-                (price.pool or "change") == pool and Market.isListable(item) then
-                local amount = price.amount
-                if type(amount) == "table" then
-                    -- A price range compiles to one at restock; here the middle
-                    -- of it is the honest reading of "what this costs".
-                    amount = math.floor(((amount.min or 0) + (amount.max or amount.min or 0)) / 2)
-                end
-                if type(amount) == "number" and amount > 0 then
+            if type(item) == "string" and item:find("%.") and Market.isListable(item) then
+                local cost = costOf(offer.price)
+                if cost then
                     table.insert(candidates, {
                         fullType = item,
-                        base = math.floor(amount)
+                        base = cost
                     })
                 end
             end
@@ -148,6 +188,21 @@ end
 --- economy it is supposed to be anchored to.
 function Simulated.invalidate()
     candidates = nil
+
+    -- The shelf as well as the cache. Prices moving is one thing and the next
+    -- restock answers it; the currency moving underneath a listing is another,
+    -- and a fake stall quoting money the server no longer uses would sit there
+    -- until it expired on its own, which is up to three days of the change
+    -- looking as though it had not taken.
+    local store = Store.get()
+    if not store then
+        return
+    end
+    local dropped = Listings.dropSimulatedNotIn(store, Market.currencyPool())
+    if dropped > 0 then
+        Market.debugLn("simulated: dropped " .. dropped .. " listing(s) priced in the old currency")
+        Store.save()
+    end
 end
 
 -- A recompile is also the moment the pools first exist, so this doubles as the
@@ -223,7 +278,7 @@ function Simulated.addOne(store, now)
         itemName = probe and probe:getName() or choice.fullType,
         qty = qty,
         unitPrice = {
-            pool = Market.feePool(),
+            pool = Market.currencyPool(),
             amount = unit
         },
         durationHours = hours,

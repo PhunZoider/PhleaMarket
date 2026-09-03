@@ -180,12 +180,17 @@ end
 Listings.FEE_PERCENT = 1
 Listings.FEE_FIXED = 2
 
---- What a fee frozen at list time comes to on a given amount.
+--- The same, unrounded.
 ---
---- Percent scales with the sale, so a partial sale pays a partial commission.
---- Fixed is per transaction, not per unit: charging a flat fee fifty times for
---- fifty nails bought at once would cost more than the nails.
-function Listings.applyFee(fee, amount)
+--- Only worth having because the listing fee multiplies by a duration tier
+--- after the rule has been applied. Rounding first throws the fraction away and
+--- the multiplier then has nothing left to scale: two percent of a forty five
+--- cent listing floors to zero, and zero times four is still zero, so short,
+--- medium and long all cost the same nothing. Holding the fraction until the
+--- single rounding at the end is what makes the tiers mean anything on a cheap
+--- listing, and it is what keeps a percentage worth having at all once an
+--- amount is counted in something coarser than cents.
+function Listings.feeValue(fee, amount)
     if type(fee) ~= "table" then
         return 0
     end
@@ -200,12 +205,24 @@ function Listings.applyFee(fee, amount)
     if percent <= 0 then
         return 0
     end
-    -- Rounded down, so rounding always favours the player.
-    local value = math.floor(amount * percent / 100)
+    local value = amount * percent / 100
     if value > amount then
         return amount
     end
     return value
+end
+
+--- What a fee frozen at list time comes to on a given amount.
+---
+--- Percent scales with the sale, so a partial sale pays a partial commission.
+--- Fixed is per transaction, not per unit: charging a flat fee fifty times for
+--- fifty nails bought at once would cost more than the nails.
+---
+--- Rounded down, so the rounding always favours the player. Commission is taken
+--- straight from this and has nothing applied after it, so this is the one
+--- place it rounds.
+function Listings.applyFee(fee, amount)
+    return math.floor(Listings.feeValue(fee, amount))
 end
 
 ---------------------------------------------------------------------------
@@ -484,6 +501,39 @@ function Listings.expireDue(store, nowHours)
         Listings.rebuildIndices(store)
     end
     return expired
+end
+
+--- Drop simulated listings priced in something the market no longer trades in.
+---
+--- A currency change leaves everything already on the shelf quoting the old
+--- money. For a listing a player made that is correct and deliberate: they
+--- asked for two dollars fifty and are owed two dollars fifty, and the pool
+--- stamped on the listing is exactly what makes honouring that possible. Those
+--- stay, and are paid in what they were listed in until they sell or expire.
+---
+--- A simulated one owes nobody anything. Leaving it means a market half priced
+--- in a currency the server no longer uses, for as long as three days, which
+--- reads as the currency change having silently failed. So they go, and the
+--- next tick stocks the shelf again at the new prices.
+---
+--- Only active ones. A sold or expired simulated listing is a finished record
+--- that purge clears on its own schedule, and reaching back into history to
+--- delete rows is not this function's business.
+---
+--- Returns how many went.
+function Listings.dropSimulatedNotIn(store, pool)
+    local dropped = 0
+    for id, listing in pairs(store.listings or {}) do
+        if listing.simulated and listing.status == Listings.STATUS.ACTIVE and
+            (listing.unitPrice and listing.unitPrice.pool) ~= pool then
+            store.listings[id] = nil
+            dropped = dropped + 1
+        end
+    end
+    if dropped > 0 then
+        Listings.rebuildIndices(store)
+    end
+    return dropped
 end
 
 --- Drop finished listings, and returns nobody came back for.

@@ -110,6 +110,83 @@ end
 ---------------------------------------------------------------------------
 -- Money
 ---------------------------------------------------------------------------
+--- Item currency, at the two points it has to be physical.
+---
+--- An item pool is counted in hundredths of an item so commission has somewhere
+--- to keep a fraction. Everything above these three functions works in those
+--- hundredths and never has to know; these are where the ledger meets a bag.
+
+--- Every whole one of `item` the player is carrying.
+local function countItems(playerObj, item)
+    local inv = playerObj and playerObj.getInventory and playerObj:getInventory()
+    if not inv then
+        return 0
+    end
+    return inv:getItemCountRecurse(item) or 0
+end
+
+--- Take `count` whole items out of a bag. All or nothing.
+---
+--- Gathered before any is removed, the same rule escrow follows: taking them
+--- one at a time and finding the fifth missing leaves four gone with nothing
+--- bought. Recursive, because money in a bag inside a bag still spends.
+local function takeItems(playerObj, item, count)
+    if count <= 0 then
+        return true
+    end
+    local inv = playerObj:getInventory()
+    local held = inv:getAllEvalRecurse(function(it)
+        return it ~= nil and it.getFullType and it:getFullType() == item
+    end, ArrayList.new())
+
+    local picked = {}
+    for i = 0, held:size() - 1 do
+        table.insert(picked, held:get(i))
+        if #picked >= count then
+            break
+        end
+    end
+    if #picked < count then
+        return false
+    end
+
+    for _, it in ipairs(picked) do
+        local container = it:getContainer() or inv
+        container:Remove(it)
+        sendRemoveItemFromContainer(container, it)
+    end
+    return true
+end
+
+--- Put `count` whole items into a bag. Returns how many actually went in.
+local function giveItems(playerObj, item, count)
+    local inv = playerObj:getInventory()
+    local given = 0
+    for _ = 1, count do
+        local added = inv:AddItem(item)
+        if not added then
+            break
+        end
+        sendAddItemToContainer(inv, added)
+        given = given + 1
+    end
+    return given
+end
+
+--- Whether a player could pay `amount` from `pool` right now.
+---
+--- Here rather than at the call sites because an item pool has no wallet
+--- balance to read, and a caller asking the wallet directly gets zero and
+--- refuses every listing on a server paying in items.
+function Store.canPay(playerObj, pool, amount)
+    amount = math.floor(tonumber(amount) or 0)
+    if amount <= 0 then
+        return true
+    end
+    -- Through the shared reader, so the window and the server cannot disagree
+    -- about whether somebody can afford this.
+    return Market.balanceOf(playerObj, pool) >= amount
+end
 
 --- Credit a pool without going past its ceiling, and say what would not fit.
 ---
@@ -123,15 +200,39 @@ end
 ---
 --- So: pay what fits, hand back the rest for the caller to park in the seller's
 --- returns. They spend down and collect the remainder.
-function Store.creditCapped(username, pool, amount)
+---
+--- An item currency uses that same remainder for a different reason. Items can
+--- only go into the hands of somebody standing here, and only in whole numbers,
+--- so a sale to an offline seller pays nothing and queues all of it, and a
+--- collection pays out the whole ones and queues the fraction. Both come back
+--- through here at the next collect. That is how a five percent commission on a
+--- five item sale is actually taken: a quarter of an item at a time, held until
+--- four sales have made a whole one.
+function Store.creditCapped(target, pool, amount)
     amount = math.floor(tonumber(amount) or 0)
     if amount <= 0 then
         return 0, 0
     end
+
+    local item = Market.poolItem(pool)
+    if item then
+        -- A username and not a player is a seller who is not here to be handed
+        -- anything. Not a failure: the goods already wait in the same queue.
+        if type(target) ~= "table" or not target.getInventory then
+            return 0, amount
+        end
+        local whole = math.floor(amount / Market.ITEM_SCALE)
+        if whole < 1 then
+            return 0, amount
+        end
+        local paid = giveItems(target, item, whole) * Market.ITEM_SCALE
+        return paid, amount - paid
+    end
+
     -- Wallet calls take a username as readily as a player object, which is what
     -- lets an offline seller be paid. Singleplayer files every wallet under one
     -- fixed key regardless, so the name only has to be right in multiplayer.
-    local key = username
+    local key = target
     local cap = Core.wallet:getCap(pool)
     local paid = amount
     if cap then
@@ -156,13 +257,27 @@ function Store.charge(playerObj, pool, amount)
     if amount <= 0 then
         return true
     end
+
+    local item = Market.poolItem(pool)
+    if item then
+        -- Rounded up, because a fraction of an item cannot be taken out of a
+        -- bag and letting it pass free is the exploitable direction. A price is
+        -- always whole items so it never lands here; a percentage listing fee
+        -- on an item currency can, which is why that fee is meant to be set
+        -- fixed. See Docs/GUIDE_ITEM_CURRENCY.md.
+        local want = math.ceil(amount / Market.ITEM_SCALE)
+        if countItems(playerObj, item) < want then
+            return false
+        end
+        return takeItems(playerObj, item, want)
+    end
+
     if (Core.wallet:getBalance(playerObj, pool) or 0) < amount then
         return false
     end
     Core.wallet:adjustByPool(playerObj, "current", pool, -amount)
     return true
 end
-
 ---------------------------------------------------------------------------
 -- Items
 ---------------------------------------------------------------------------

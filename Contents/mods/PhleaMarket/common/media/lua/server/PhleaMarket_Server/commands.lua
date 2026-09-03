@@ -100,7 +100,7 @@ Commands[C.list] = function(playerObj, args)
     local askingTotal = price * qty
     local fee = Market.listingFeeFor(askingTotal, args.duration)
     local pool = Store.feePool()
-    if fee > 0 and (Core.wallet:getBalance(playerObj, pool) or 0) < fee then
+    if fee > 0 and not Store.canPay(playerObj, pool, fee) then
         return fail(playerObj, "CannotAffordFee", {
             fee = fee
         })
@@ -134,7 +134,10 @@ Commands[C.list] = function(playerObj, args)
         itemName = held:getName(),
         qty = qty,
         unitPrice = {
-            pool = args.pool or "change",
+            -- Decided here and not taken from the client. What the server calls
+            -- money is not a thing a listing gets to name for itself, and a
+            -- pool arriving over the wire is a pool somebody chose.
+            pool = Market.currencyPool(),
             amount = price
         },
         duration = args.duration,
@@ -221,7 +224,9 @@ Commands[C.buy] = function(playerObj, args)
     -- Then hand it over. If this fails the buyer is refunded: they have paid
     -- for something they did not get, and the listing has not been touched.
     if not Store.deliver(playerObj, listing.snapshot, quote.qty) then
-        Store.creditCapped(nameOf(playerObj), quote.pool, quote.gross)
+        -- The buyer is standing here, so an item refund goes straight back into
+        -- their hands rather than queueing for a collection they did not earn.
+        Store.creditCapped(playerObj, quote.pool, quote.gross)
         return fail(playerObj, "CouldNotDeliver")
     end
 
@@ -358,7 +363,7 @@ Commands[C.collect] = function(playerObj, args)
 
     local creditedTotal, stillHeld = 0, 0
     for _, entry in ipairs(credits) do
-        local paid, held = Store.creditCapped(username, entry.pool, entry.amount)
+        local paid, held = Store.creditCapped(playerObj, entry.pool, entry.amount)
         creditedTotal = creditedTotal + paid
         if held > 0 then
             stillHeld = stillHeld + held
@@ -415,7 +420,7 @@ Commands[C.relist] = function(playerObj, args)
 
     local fee = Market.listingFeeFor(price * entry.qty, args.duration)
     local pool = Store.feePool()
-    if fee > 0 and (Core.wallet:getBalance(playerObj, pool) or 0) < fee then
+    if fee > 0 and not Store.canPay(playerObj, pool, fee) then
         return fail(playerObj, "CannotAffordFee", {
             fee = fee
         })
@@ -429,7 +434,7 @@ Commands[C.relist] = function(playerObj, args)
         itemName = entry.itemName,
         qty = entry.qty,
         unitPrice = {
-            pool = (entry.unitPrice and entry.unitPrice.pool) or "change",
+            pool = (entry.unitPrice and entry.unitPrice.pool) or Market.currencyPool(),
             amount = price
         },
         duration = args.duration,

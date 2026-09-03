@@ -48,7 +48,7 @@ local function asOffer(id, fullType, unit, pool, qty, meta)
         item = fullType,
         price = {
             kind = "currency",
-            pool = pool or "change",
+            pool = pool or Market.currencyPool(),
             amount = unit or 0
         },
         offer = {
@@ -249,7 +249,7 @@ Core.registerShopMode({
             if guide then
                 local key = guide.low == guide.high and "IGUI_PhleaMarket_GroupHeadingFlat" or
                                 "IGUI_PhleaMarket_GroupHeading"
-                text = getText(key, text, Market.formatAmount("change", guide.low), tostring(#(rows or {})))
+                text = getText(key, text, Market.formatAmount(Market.currencyPool(), guide.low), tostring(#(rows or {})))
             end
 
             -- Cut to what is left of the strip. A label draws its whole string
@@ -324,7 +324,7 @@ Core.registerShopMode({
         -- are to be had across every listing of it.
         for _, row in ipairs(browse.rows or {}) do
             if matches(ui, row) then
-                offers["type:" .. row.fullType] = asOffer("type:" .. row.fullType, row.fullType, row.low, "change",
+                offers["type:" .. row.fullType] = asOffer("type:" .. row.fullType, row.fullType, row.low, Market.currencyPool(),
                     row.available)
             end
         end
@@ -358,7 +358,7 @@ Core.registerShopMode({
         if not price then
             return false
         end
-        return (Core.wallet:getBalance(ui.player, price.pool) or 0) >= (price.amount or 0)
+        return Market.balanceOf(ui.player, price.pool) >= (price.amount or 0)
     end,
 
     --- What the tile above is standing for.
@@ -396,7 +396,7 @@ Core.registerShopMode({
                     }}
                 end
                 return {{
-                    text = getText("IGUI_PhleaMarket_FromPrice", Market.formatAmount("change", row.low))
+                    text = getText("IGUI_PhleaMarket_FromPrice", Market.formatAmount(Market.currencyPool(), row.low))
                 }, {
                     text = getText("IGUI_PhleaMarket_AcrossListings", tostring(row.listings))
                 }}
@@ -549,7 +549,7 @@ Core.registerShopMode({
             -- Priced at nothing: the seller has not said what they want for it
             -- yet, and showing a made-up figure would be showing them a number
             -- they did not choose.
-            offers[fullType] = asOffer(fullType, fullType, 0, "change", row.count)
+            offers[fullType] = asOffer(fullType, fullType, 0, Market.currencyPool(), row.count)
         end
         return gridOf(ui, offers)
     end,

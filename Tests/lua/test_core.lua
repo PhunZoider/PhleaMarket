@@ -195,6 +195,152 @@ do
         limits.minPrice .. " / " .. limits.maxPrice)
 end
 
+
+print("-- what the market calls money --")
+do
+    local ITEM = "item:Base.Money"
+
+    -- Change, which is what a server that has never touched currency_base runs.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "currency",
+            pool = "change"
+        }
+    end
+    ok("an untouched server prices in change", Market.currencyPool() == "change")
+    ok("and change is not an item pool", Market.poolItem("change") == nil)
+
+    -- An item currency, which is one edit to currency_base and nothing here.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money"
+        }
+    end
+    ok("an item currency prices in that item", Market.currencyPool() == ITEM)
+    ok("and the item comes back out of the pool", Market.poolItem(ITEM) == "Base.Money")
+
+    -- A PhunMart too old to answer is a PhunMart with no item currency to have.
+    _G.PhunMart.currencyDef = nil
+    ok("no currencyDef at all means change", Market.currencyPool() == "change")
+
+    -- Typed in whole items, stored in hundredths of one, so that commission has
+    -- somewhere to put a fraction.
+    ok("a price is typed in whole items", Market.parseAmount(ITEM, "5") == 500)
+    ok("half an item is not a price anybody may name", Market.parseAmount(ITEM, "3.5") == 300)
+    ok("and it reads back as what was typed", Market.amountToText(ITEM, 500) == "5")
+
+    -- The decimal point belongs to the money that has one.
+    ok("an item pool takes no decimal point", Market.isSubunitPool(ITEM) == false)
+    ok("change still does", Market.isSubunitPool("change") == true)
+
+    ok("five items reads as five", Market.formatAmount(ITEM, 500) == "5 Money")
+    -- The 75 hundredths are commission's, held until there is a whole one.
+    ok("a held fraction is not collectable yet", Market.formatAmount(ITEM, 575) == "5 Money")
+    ok("change is left exactly as it was", Market.formatAmount("change", 250) == "$2.50")
+end
+
+print("-- what a player can pay with --")
+do
+    local ITEM = "item:Base.Money"
+
+    -- A bag holding `count` of Base.Money and nothing else worth counting.
+    local function bagOf(count)
+        return {
+            getInventory = function()
+                return {
+                    getItemCountRecurse = function(_, fullType)
+                        return fullType == "Base.Money" and count or 0
+                    end
+                }
+            end
+        }
+    end
+
+    _G.PhunMart.wallet.getBalance = function(_, _, pool)
+        return pool == "change" and 250 or 0
+    end
+
+    ok("an item pool is counted out of the bag, in hundredths",
+        Market.balanceOf(bagOf(7), ITEM) == 700)
+    ok("an empty bag can pay nothing", Market.balanceOf(bagOf(0), ITEM) == 0)
+    ok("and a wallet pool still comes from the wallet",
+        Market.balanceOf(bagOf(7), "change") == 250)
+    -- Nobody to ask is not a crash, it is a balance of nothing.
+    ok("no player is no money", Market.balanceOf(nil, ITEM) == 0)
+
+    -- Fees follow the currency, because a server paying in items has usually
+    -- turned the change pool off and a fee nobody can pay refuses every listing.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money"
+        }
+    end
+    options({})
+    ok("an unset fee pool follows the currency", Market.feePool() == ITEM)
+
+    options({
+        FeePool = "tokens"
+    })
+    ok("a fee pool an admin named wins", Market.feePool() == "tokens")
+
+    _G.PhunMart.currencyDef = nil
+    options({})
+    ok("and on a change server it is still change", Market.feePool() == "change")
+end
+
+print("-- price limits on an item currency --")
+do
+    local ITEM = "item:Base.Money"
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money"
+        }
+    end
+
+    -- The shipped numbers, read as whole items rather than as hundredths.
+    options({
+        MinPrice = 5,
+        MaxPrice = 9999,
+        PriceStep = 5
+    })
+    local lim = Market.limits()
+    ok("the floor is five items", lim.minPrice == 500, tostring(lim.minPrice))
+    -- Brought down to the last step a listing could actually hold, the same way
+    -- it is on the change pool, where a ceiling of 9999 lands on 9995.
+    ok("the ceiling comes down to the last listable step", lim.maxPrice == 999500,
+        tostring(lim.maxPrice))
+    ok("and the step is five", lim.step == 500, tostring(lim.step))
+
+    -- Which is what the seller is told, and the reason this exists: unscaled
+    -- it read as a floor of nothing in steps of nothing.
+    ok("the range reads in items", Market.formatAmount(ITEM, lim.minPrice) == "5 Money")
+    ok("and so does the step", Market.formatAmount(ITEM, lim.step) == "5 Money")
+
+    -- Never finer than one whole item, whatever an admin sets, because a price
+    -- the seller cannot type is a price the buy path would round up on.
+    options({
+        MinPrice = 1,
+        MaxPrice = 100,
+        PriceStep = 1
+    })
+    lim = Market.limits()
+    ok("a step of one is one whole item", lim.step == 100, tostring(lim.step))
+    ok("and the floor cannot go under one either", lim.minPrice == 100, tostring(lim.minPrice))
+
+    -- Change is left exactly as it was: these are already its own units.
+    _G.PhunMart.currencyDef = nil
+    options({
+        MinPrice = 5,
+        MaxPrice = 9999,
+        PriceStep = 5
+    })
+    lim = Market.limits()
+    ok("a change server keeps its cents", lim.minPrice == 5 and lim.maxPrice == 9995 and lim.step == 5,
+        lim.minPrice .. "/" .. lim.maxPrice .. "/" .. lim.step)
+end
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)
 os.exit(failed == 0 and 0 or 1)

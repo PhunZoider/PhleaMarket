@@ -66,6 +66,7 @@ local function list(store, over)
         durationHours = over.durationHours or 72,
         listingFee = over.listingFee or 0,
         commission = over.commission or PERCENT_5,
+        simulated = over.simulated,
         nowHours = over.nowHours or 1000,
         limits = over.limits
     })
@@ -303,6 +304,21 @@ do
         percent = 200
     }, 100) == 100)
     ok("no fee at all", L.applyFee(nil, 1000) == 0)
+
+    -- The listing fee multiplies by a duration tier after the rule is applied,
+    -- so the rule has to hand back the fraction rather than a rounded figure.
+    -- Rounding first is how short, medium and long all came to cost nothing on
+    -- a cheap listing.
+    ok("a fraction survives the rule", L.feeValue(PERCENT_5, 10) == 0.5)
+    ok("and is gone once it is charged", L.applyFee(PERCENT_5, 10) == 0)
+    ok("so a duration multiplier still has something to scale",
+        math.floor(L.feeValue(PERCENT_5, 10) * 4) == 2)
+    ok("where rounding first would have left it nothing",
+        math.floor(L.applyFee(PERCENT_5, 10) * 4) == 0)
+    ok("a fixed fee is whole either way", L.feeValue({
+        mode = L.FEE_FIXED,
+        fixed = 25
+    }, 1000) == 25)
 end
 
 print("-- buying the whole thing --")
@@ -911,6 +927,41 @@ do
 end
 
 ---------------------------------------------------------------------------
+
+print("-- a currency change clears the fake stalls --")
+do
+    local store = L.newStore()
+    local ITEM = "item:Base.Money"
+
+    local mine = list(store, {
+        seller = "steve"
+    })
+    local staleFake = list(store, {
+        seller = "nobody",
+        simulated = true
+    })
+    local currentFake = list(store, {
+        seller = "someone",
+        simulated = true,
+        unitPrice = {
+            pool = ITEM,
+            amount = 300
+        }
+    })
+
+    local dropped = L.dropSimulatedNotIn(store, ITEM)
+    ok("the stall priced in the old money goes", dropped == 1, tostring(dropped))
+    ok("and is gone from the store", L.get(store, staleFake.id) == nil)
+    ok("one already in the new money stays", L.get(store, currentFake.id) ~= nil)
+
+    -- The whole reason the pool is stamped per listing: a seller asked for that
+    -- price and is owed it in the money they asked for.
+    ok("and a listing a player made is never touched", L.get(store, mine.id) ~= nil)
+
+    -- Nothing left to do on a second pass, which matters because this runs on
+    -- every recompile and most of them change no currency at all.
+    ok("a second pass finds nothing", L.dropSimulatedNotIn(store, ITEM) == 0)
+end
 
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)

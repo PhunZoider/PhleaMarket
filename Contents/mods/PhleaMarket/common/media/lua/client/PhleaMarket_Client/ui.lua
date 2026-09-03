@@ -65,7 +65,7 @@ function UI.successText(payload)
     payload = payload or {}
     if payload.action == "list" or payload.action == "relist" then
         if (payload.fee or 0) > 0 then
-            return getText("IGUI_PhleaMarket_Msg_ListedWithFee", Market.formatAmount("change", payload.fee))
+            return getText("IGUI_PhleaMarket_Msg_ListedWithFee", Market.formatAmount(Market.feePool(), payload.fee))
         end
         return getText("IGUI_PhleaMarket_Msg_Listed")
     elseif payload.action == "buy" then
@@ -79,7 +79,7 @@ function UI.successText(payload)
         -- that leaves money behind because the wallet is full otherwise looks
         -- like a collect that did nothing.
         if (payload.stillHeld or 0) > 0 then
-            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount("change", payload.stillHeld))
+            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount(Market.currencyPool(), payload.stillHeld))
         end
         if (payload.keptBack or 0) > 0 then
             return getText("IGUI_PhleaMarket_Msg_CollectedNoRoom")
@@ -116,10 +116,10 @@ local function showNotices(payload)
     if #notices == 1 and missed == 0 then
         local one = notices[1]
         text = getText("IGUI_PhleaMarket_SoldOne", tostring(one.qty or 1), tostring(one.itemName or "?"),
-            Market.formatAmount("change", one.net or 0))
+            Market.formatAmount(Market.currencyPool(), one.net or 0))
     else
         text = getText("IGUI_PhleaMarket_SoldMany", tostring(#notices + missed), tostring(items),
-            Market.formatAmount("change", total))
+            Market.formatAmount(Market.currencyPool(), total))
     end
 
     local toast = Core.ui and Core.ui.toast
@@ -184,12 +184,13 @@ function Dialog:new(x, y, window, row)
         a = 1
     }
     o.duration = "medium"
-    -- Everything listed is priced in change. Named once rather than repeated at
-    -- each of the places that ask the pool how to say a figure or how to read
-    -- one, since the day a second pool is listable they all have to move
-    -- together or the dialog starts writing prices in one unit and reading them
-    -- in another.
-    o.pool = "change"
+    -- Whatever the server currently calls money. Named once rather than
+    -- repeated at each of the places that ask the pool how to say a figure or
+    -- how to read one, because they all have to agree: a dialog writing prices
+    -- in one unit and reading them back in another is how a rifle gets listed
+    -- for a nickel. The server decides this again when the listing lands, so
+    -- what is held here only has to be right for what the seller is shown.
+    o.pool = Market.currencyPool()
     return o
 end
 
@@ -497,8 +498,7 @@ function Dialog:onOK()
         fullType = self.row.fullType,
         qty = qty,
         unitPrice = price,
-        duration = self.duration,
-        pool = "change"
+        duration = self.duration
     })
     -- Remembered locally as well as on the server, so the next listing in this
     -- session is prefilled even before the server answers.
@@ -633,7 +633,7 @@ end
 function Buy:render()
     ISPanel.render(self)
     local pad = math.floor(12 * FS)
-    local pool = self.row.pool or "change"
+    local pool = self.row.pool or Market.currencyPool()
 
     self:drawText(getText("IGUI_PhleaMarket_BuyTitle", self.row.itemName or "?"), pad, pad, 1, 1, 1, 1, UIFont.Medium)
 
@@ -649,7 +649,7 @@ function Buy:render()
         self.qtyBox:getY() + math.floor(4 * FS), 0.8, 0.8, 0.8, 1, UIFont.Small)
 
     local total = (self.row.unit or 0) * qty
-    local balance = Core.wallet and Core.wallet:getBalance(getPlayer(), pool) or 0
+    local balance = Market.balanceOf(getPlayer(), pool)
     local afford = balance >= total
 
     local y = self.figuresY
@@ -675,7 +675,7 @@ end
 
 function Buy:onOK()
     local qty = self:value()
-    local balance = Core.wallet and Core.wallet:getBalance(getPlayer(), self.row.pool or "change") or 0
+    local balance = Market.balanceOf(getPlayer(), self.row.pool or Market.currencyPool())
     if qty < 1 or balance < (self.row.unit or 0) * qty then
         return
     end
