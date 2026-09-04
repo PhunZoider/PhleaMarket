@@ -43,14 +43,36 @@ Market.modes = Modes
 --- -1 means unlimited to the grid so it must never be used here: everything in
 --- a market is finite.
 local function asOffer(id, fullType, unit, pool, qty, meta)
+    pool = pool or Market.currencyPool()
+    unit = unit or 0
+
+    -- The grid is PhunMart's, and its badge formatter reads the shape of a
+    -- price to decide what to draw: a currency price becomes "$3.00", an item
+    -- price becomes a count with that item's own icon beside it. On an item
+    -- currency the second is what this actually is, and saying otherwise drew a
+    -- three item price as three dollars on a server that has no dollars.
+    --
+    -- pool and amount stay on it either way. They are what canAction asks, and
+    -- they are in ledger units, which is the only form the rest of this file
+    -- and the server agree on.
+    local price = {
+        kind = "currency",
+        pool = pool,
+        amount = unit
+    }
+    local currencyItem = Market.poolItem(pool)
+    if currencyItem then
+        price.kind = "items"
+        price.items = {{
+            item = currencyItem,
+            amount = math.floor(unit / Market.ITEM_SCALE)
+        }}
+    end
+
     return {
         id = id,
         item = fullType,
-        price = {
-            kind = "currency",
-            pool = pool or Market.currencyPool(),
-            amount = unit or 0
-        },
+        price = price,
         offer = {
             qty = 1,
             stockQty = math.max(0, math.floor(qty or 0))
