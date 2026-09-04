@@ -293,6 +293,15 @@ function Market.poolItemLabel(item)
     if not item then
         return ""
     end
+
+    -- What the server has chosen to call its money wins over what the game
+    -- calls the item. "3 Money" is what Base.Money gives you and it reads
+    -- oddly; a server trading in bottle caps wants to say so.
+    local def = Core.currencyDef and Core.currencyDef()
+    if def and def.item == item and def.label and def.label ~= "" then
+        return def.label
+    end
+
     local ok, name = pcall(function()
         local si = getScriptManager():getItem(item)
         return si and si:getDisplayName() or nil
@@ -355,24 +364,38 @@ end
 --- change is counted in cents and reads as $0.05, tokens are counted in tokens
 --- and read as 5. Showing the raw number leaves a seller typing 5 and having no
 --- idea whether they have asked for a nickel or five dollars.
+--- Digits in threes, so a four figure price is read rather than counted.
+---
+--- Its own copy for the same reason the cents arithmetic below is: the shared
+--- one lives in a client-only module of another mod, and this runs on the
+--- server too.
+local function grouped(n)
+    local s = tostring(math.floor(math.abs(tonumber(n) or 0)))
+    local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return out
+end
+Market.groupDigits = grouped
+
 function Market.formatAmount(pool, amount)
     amount = tonumber(amount) or 0
+    local sign = amount < 0 and "-" or ""
     local item = Market.poolItem(pool)
     if item then
         -- Floored, so a balance never reads as more than it could pay out. What
         -- the floor drops is not lost, it is only not collectable yet.
-        local sign = amount < 0 and "-" or ""
         local n = math.floor(math.abs(amount) / Market.ITEM_SCALE)
-        return sign .. tostring(n) .. " " .. Market.poolItemLabel(item)
+        return sign .. grouped(n) .. " " .. Market.poolItemLabel(item)
     end
     if isSubunit(pool) then
         -- The shared formatter lives in a client-only module, so this does the
         -- same arithmetic rather than reaching across for it.
-        local sign = amount < 0 and "-" or ""
+        -- Always two decimals, unlike PhunMart's own formatCents which drops
+        -- them on a round figure. That is deliberate here: this form is read and
+        -- never edited, and a column of prices lines up on the point.
         local n = math.abs(math.floor(amount))
-        return string.format("%s$%d.%02d", sign, math.floor(n / 100), n % 100)
+        return sign .. "$" .. grouped(math.floor(n / 100)) .. string.format(".%02d", n % 100)
     end
-    return tostring(math.floor(amount))
+    return sign .. grouped(amount)
 end
 
 --- A figure somebody typed, as a number of pool units.
@@ -460,6 +483,22 @@ function Market.listingFeeFor(askingTotal, duration)
     if fee > askingTotal then
         fee = askingTotal
     end
+
+    -- On an item currency the fee has to be a whole number of items, because it
+    -- is taken out of a bag before there is any balance to hold a fraction in.
+    -- Rounded up rather than down: charge is what decides the real figure and
+    -- it rounds up too, so anything else here shows a seller one number and
+    -- takes another. Six hundredths of an item read as "costs 0 to list" and
+    -- then cost them a whole one.
+    --
+    -- The cap above still holds, so a fee can never exceed the ask even when
+    -- rounding up would carry it past.
+    local item = Market.poolItem(Market.feePool())
+    if item and fee > 0 then
+        local scale = Market.ITEM_SCALE
+        fee = math.min(math.ceil(fee / scale) * scale, math.floor(askingTotal / scale) * scale)
+    end
+
     return math.floor(fee)
 end
 

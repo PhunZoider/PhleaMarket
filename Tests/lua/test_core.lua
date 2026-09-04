@@ -341,6 +341,102 @@ do
     ok("a change server keeps its cents", lim.minPrice == 5 and lim.maxPrice == 9995 and lim.step == 5,
         lim.minPrice .. "/" .. lim.maxPrice .. "/" .. lim.step)
 end
+
+print("-- figures are read, not counted --")
+do
+    local ITEM = "item:Base.Money"
+    _G.PhunMart.currencyDef = nil
+
+    ok("hundreds are left alone", Market.formatAmount("change", 12345) == "$123.45")
+    ok("thousands are grouped", Market.formatAmount("change", 1234567) == "$12,345.67")
+    ok("and millions too", Market.formatAmount("change", 123456789) == "$1,234,567.89")
+    -- Always two decimals here, unlike PhunMart's formatCents which drops them
+    -- on a round figure. A column of prices lines up on the point.
+    ok("a round figure keeps its decimals", Market.formatAmount("change", 10500) == "$105.00")
+    ok("a counted pool groups as well", Market.formatAmount("tokens", 4200) == "4,200")
+    ok("and so does an item one", Market.formatAmount(ITEM, 1234500) == "12,345 Money")
+    ok("negatives keep their sign", Market.formatAmount("change", -1234567) == "-$12,345.67")
+
+    -- What the server calls its money beats what the game calls the item.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money",
+            label = "Caps"
+        }
+    end
+    ok("a configured name is used", Market.formatAmount(ITEM, 300) == "3 Caps")
+
+    -- Blank or absent falls back, which is the shipped behaviour.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money",
+            label = ""
+        }
+    end
+    ok("an empty name falls back to the item", Market.formatAmount(ITEM, 300) == "3 Money")
+
+    -- And it only speaks for the currency it was set on.
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money",
+            label = "Caps"
+        }
+    end
+    ok("another item is not renamed", Market.formatAmount("item:Base.Nails", 300) == "3 Nails")
+end
+
+print("-- a listing fee has to be a whole item --")
+do
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money"
+        }
+    end
+
+    -- Two percent of three items is six hundredths. It used to read as "costs 0
+    -- to list" and then take a whole one, because charge rounds up and the
+    -- display floored.
+    options({
+        ListingFeeMode = 1,
+        ListingFeePercent = 2,
+        ListingFeeMin = 0
+    })
+    local fee = Market.listingFeeFor(300, "short")
+    ok("a fee too small to take rounds up to one", fee == 100, tostring(fee))
+    ok("and says so", Market.formatAmount(Market.feePool(), fee) == "1 Money")
+
+    -- Never past what is being asked, even when rounding up would carry it.
+    ok("a fee never exceeds a one item ask", Market.listingFeeFor(100, "long") <= 100)
+
+    -- The duration tiers still separate once the fee is big enough to have
+    -- whole items in it to separate.
+    options({
+        ListingFeeMode = 1,
+        ListingFeePercent = 10,
+        ListingFeeMin = 0
+    })
+    local short = Market.listingFeeFor(5000, "short")
+    local long = Market.listingFeeFor(5000, "long")
+    ok("a long listing still costs more than a short one", long > short,
+        short .. " / " .. long)
+    ok("and both are whole items", short % 100 == 0 and long % 100 == 0,
+        short .. " / " .. long)
+
+    -- Free stays free: rounding up must not invent a fee where none was set.
+    options({
+        ListingFeeMode = 1,
+        ListingFeePercent = 0,
+        ListingFeeFixed = 0
+    })
+    ok("no fee configured is still no fee", Market.listingFeeFor(5000, "long") == 0)
+
+    _G.PhunMart.currencyDef = nil
+    options({})
+end
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)
 os.exit(failed == 0 and 0 or 1)
