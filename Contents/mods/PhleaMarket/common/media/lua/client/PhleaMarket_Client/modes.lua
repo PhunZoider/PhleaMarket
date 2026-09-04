@@ -75,7 +75,11 @@ local function asOffer(id, fullType, unit, pool, qty, meta)
         price = price,
         offer = {
             qty = 1,
-            stockQty = math.max(0, math.floor(qty or 0))
+            stockQty = math.max(0, math.floor(qty or 0)),
+            -- Every listing here is finite, so a count of one is the default
+            -- rather than the scarcity it means on a shop shelf. Left at one it
+            -- put a badge on nearly every tile in the market saying nothing.
+            minStockBadge = 2
         },
         meta = meta
     }
@@ -96,7 +100,10 @@ local function asUnpricedOffer(id, fullType, qty)
         item = fullType,
         offer = {
             qty = 1,
-            stockQty = math.max(0, math.floor(qty or 0))
+            stockQty = math.max(0, math.floor(qty or 0)),
+            -- As above: a single one of something in the bag is the ordinary
+            -- case, and the badge is for the stacks.
+            minStockBadge = 2
         }
     }
 end
