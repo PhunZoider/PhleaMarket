@@ -28,13 +28,32 @@ require "PhleaMarket/core"
 local Core = PhunMart
 local Market = PhleaMarket
 
--- What the sprite properties used to say: a near-white at two tiles, which is
--- the reach vanilla gives a vending machine. Colours are 0..1 here and were
--- 0..255 there.
-local LIGHT_R, LIGHT_G, LIGHT_B = 225 / 255, 225 / 255, 225 / 255
+-- A warm white, against a night PZ paints blue. Written as the 0..255 anybody
+-- reading this would reach for and divided down, because a light source wants
+-- 0..1. Two tiles is the reach vanilla gives a vending machine.
+local LIGHT_R, LIGHT_G, LIGHT_B = 255 / 255, 214 / 255, 170 / 255
 local LIGHT_RADIUS = 2
 
---- Every machine this client has seen, by square, as {x, y, z}.
+--- Which way a tile faces, in squares.
+---
+--- A lamppost is a point and the engine has no cone to aim, so the closest
+--- thing to a directional machine is to hang its light on the square in front
+--- of it rather than on the machine. The glow then lands on the ground the
+--- glass is facing, and the machine, being solid, shades its own back.
+local AHEAD = {
+    N = {x = 0, y = -1},
+    S = {x = 0, y = 1},
+    E = {x = 1, y = 0},
+    W = {x = -1, y = 0}
+}
+
+-- How far in front to hang it. Zero puts the light back on the machine, and a
+-- negative number puts it behind, which is the one-character fix if the sprite
+-- property turns out to name the side the machine's back is against.
+local AHEAD_TILES = 1
+
+--- Every machine this client has seen, keyed by its own square. The light is
+--- remembered separately as {x, y, z}, because it does not hang on that square.
 local known = {}
 
 --- The lamppost burning at a square, for those that have one.
@@ -55,13 +74,31 @@ end
 --- has been past, and that can be after this one has. CustomName is on all
 --- eight sprites, powered and unplugged alike, so it answers the same for a
 --- machine in either state.
+local function propsOf(isoObject)
+    local sprite = isoObject and isoObject:getSprite()
+    return sprite and sprite:getProperties() or nil
+end
+
 local function isMachine(isoObject)
-    if not isoObject then
-        return false
-    end
-    local sprite = isoObject:getSprite()
-    local props = sprite and sprite:getProperties()
+    local props = propsOf(isoObject)
     return props ~= nil and props:get("CustomName") == Market.name
+end
+
+--- The square a machine's light should hang over.
+---
+--- The direction comes off the sprite rather than off the object, because the
+--- sprite is what is actually being looked at: all eight of them carry Facing,
+--- and a machine that swaps to its unplugged face keeps the same one. A sprite
+--- with no Facing, which would mean somebody has pointed the shop at art of
+--- their own, leaves the light on the machine.
+local function lightSquare(isoObject, square)
+    local x, y, z = square:getX(), square:getY(), square:getZ()
+    local props = propsOf(isoObject)
+    local ahead = props and AHEAD[props:get("Facing")]
+    if not ahead then
+        return x, y, z
+    end
+    return x + ahead.x * AHEAD_TILES, y + ahead.y * AHEAD_TILES, z
 end
 
 --- The machine standing on a square, if one is.
@@ -113,10 +150,10 @@ local function extinguish(key)
         cell:removeLamppost(light)
     end
     lit[key] = nil
-    Market.debugLn("light out at " .. key)
+    Market.debugLn("light out for the machine at " .. key)
 end
 
-local function ignite(key, x, y, z)
+local function ignite(key, where)
     if lit[key] then
         return
     end
@@ -124,16 +161,16 @@ local function ignite(key, x, y, z)
     if not cell then
         return
     end
-    local light = IsoLightSource.new(x, y, z, LIGHT_R, LIGHT_G, LIGHT_B, LIGHT_RADIUS)
+    local light = IsoLightSource.new(where.x, where.y, where.z, LIGHT_R, LIGHT_G, LIGHT_B, LIGHT_RADIUS)
     cell:addLamppost(light)
     lit[key] = light
-    Market.debugLn("light on at " .. key)
+    Market.debugLn("light on at " .. keyFor(where.x, where.y, where.z) .. " for the machine at " .. key)
 end
 
 --- Put one machine's light where it should be, lit or out.
 local function settle(key, at, square)
     if shouldBurn(square) then
-        ignite(key, at.x, at.y, at.z)
+        ignite(key, at.light)
     else
         extinguish(key)
     end
@@ -147,8 +184,12 @@ local function remember(isoObject)
     end
     local x, y, z = square:getX(), square:getY(), square:getZ()
     local key = keyFor(x, y, z)
-    local at = known[key] or {x = x, y = y, z = z}
-    known[key] = at
+    local at = known[key]
+    if not at then
+        local lx, ly, lz = lightSquare(isoObject, square)
+        at = {x = x, y = y, z = z, light = {x = lx, y = ly, z = lz}}
+        known[key] = at
+    end
     settle(key, at, square)
 end
 
