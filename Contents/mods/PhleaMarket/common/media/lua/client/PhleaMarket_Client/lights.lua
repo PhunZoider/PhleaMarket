@@ -113,6 +113,7 @@ local function extinguish(key)
         cell:removeLamppost(light)
     end
     lit[key] = nil
+    Market.debugLn("light out at " .. key)
 end
 
 local function ignite(key, x, y, z)
@@ -126,6 +127,7 @@ local function ignite(key, x, y, z)
     local light = IsoLightSource.new(x, y, z, LIGHT_R, LIGHT_G, LIGHT_B, LIGHT_RADIUS)
     cell:addLamppost(light)
     lit[key] = light
+    Market.debugLn("light on at " .. key)
 end
 
 --- Put one machine's light where it should be, lit or out.
