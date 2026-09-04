@@ -605,18 +605,8 @@ function Market.isListable(fullType)
     end
 
     -- Unknown to the game: refuse rather than escrow something that cannot be
-    -- built again.
-    --
-    -- getItem and not FindItem, which is the whole of a bug worth writing down.
-    -- FindItem is the lenient lookup and will resolve a name that is not a real
-    -- type by falling back to one that is: an applied bandage reports its type
-    -- as Base.Bandage_RightLowerLeg, which FindItem happily answers for and
-    -- getItem does not. So this gate passed, the item was escrowed off the
-    -- player's body, and then Snapshot.restore -- which asks getItem, strictly,
-    -- and always has -- could never build it back. Neither the buyer nor the
-    -- seller could ever get it: a listing that ate the item.
-    --
-    -- The two have to ask the same question. This one asks restore's.
+    -- built again. getItem is the strict lookup and the one restore asks, so
+    -- the gate and the builder agree on what exists.
     local manager = type(getScriptManager) == "function" and getScriptManager()
     if not manager or type(manager.getItem) ~= "function" then
         return false
@@ -624,6 +614,32 @@ function Market.isListable(fullType)
     local ok, script = pcall(manager.getItem, manager, fullType)
     if not ok or not script then
         return false
+    end
+
+    -- Worn appearance, not property. An applied bandage is a real item script:
+    -- Base.Bandage_RightLowerLeg is declared in module Base, generated into
+    -- clothing.txt with `hidden = true`. So every existence check the market
+    -- can make says yes to it, and so does instanceItem. Existence was the
+    -- wrong question to be asking. The same family covers the ZedDmg wound
+    -- overlays, the makeup, the stubble, and whatever a body mod adds next.
+    --
+    -- `hidden` is the flag the game sets on exactly these, and the game itself
+    -- asks it in the same place we are: ISTradingUI refuses to put a hidden
+    -- item into a player-to-player trade, and ISInventoryPane will not draw one
+    -- as a row. Obsolete travels with it because the admin item list pairs them
+    -- -- kept in the scripts for old saves, not for a market to sell.
+    --
+    -- Asked per method rather than in one go. These live on ScriptItem in B42,
+    -- but a script object from a mod or an older build may not carry them, and
+    -- a market that refuses everything because one accessor is missing is worse
+    -- than one that offers a wound overlay.
+    for _, method in ipairs({ "isHidden", "getObsolete" }) do
+        if type(script[method]) == "function" then
+            local asked, flagged = pcall(script[method], script)
+            if asked and flagged then
+                return false
+            end
+        end
     end
 
     if hasAny(Market.blocked.categories) and script.getDisplayCategory then

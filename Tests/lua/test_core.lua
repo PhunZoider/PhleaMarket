@@ -472,49 +472,74 @@ end
 
 print("-- what may be listed at all --")
 do
-    -- A script manager shaped like the real one: getItem is strict and takes a
-    -- full type, FindItem is lenient and will answer for a name that is not a
-    -- real type by falling back to one that is. That leniency is the bug this
-    -- pins, so the mock has to have it or the test proves nothing.
-    local REAL = {
-        ["Base.Axe"] = true,
-        ["Base.Bandage"] = true
+    -- A script manager shaped like the real one.
+    --
+    -- The point the first attempt at this test missed: Base.Bandage_RightLowerLeg
+    -- is a REAL item. The game generates it into media/scripts/generated/items/
+    -- clothing.txt, in module Base, alongside the ZedDmg wound overlays and the
+    -- makeup, and marks the lot of them `hidden = true`. A mock that answers nil
+    -- for it is not a mock of this game, and a test built on one passes while
+    -- the player still sells the bandage off their leg. So these exist, and are
+    -- told apart by the flag the game actually sets.
+    local SCRIPTS = {
+        ["Base.Axe"] = {},
+        ["Base.Bandage"] = {},
+        ["Base.Bandage_RightLowerLeg"] = { hidden = true },
+        ["Base.ZedDmg_BELLY_Slash"] = { hidden = true },
+        ["Base.F_Hair_Stubble"] = { hidden = true },
+        ["Base.OldRemovedThing"] = { obsolete = true }
     }
+    local function scriptFor(fullType)
+        local def = SCRIPTS[fullType]
+        if not def then
+            return nil
+        end
+        return {
+            isHidden = function()
+                return def.hidden == true
+            end,
+            getObsolete = function()
+                return def.obsolete == true
+            end
+        }
+    end
     _G.getScriptManager = function()
         return {
             getItem = function(_, fullType)
-                return REAL[fullType] and {
-                    type = fullType
-                } or nil
-            end,
-            FindItem = function(_, name)
-                if REAL[name] then
-                    return {
-                        type = name
-                    }
-                end
-                -- The fallback: Base.Bandage_RightLowerLeg finds Base.Bandage.
-                local stem = name and name:match("^(.-)_")
-                return stem and REAL[stem] and {
-                    type = stem
-                } or nil
+                return scriptFor(fullType)
             end
         }
     end
 
     ok("a real item is listable", Market.isListable("Base.Axe"))
 
-    -- An applied bandage reports this as its type. It cannot be built again, so
-    -- listing one escrowed it off the player's body and left it unrecoverable
-    -- by either side.
+    -- A bandage applied to a limb. It exists, and instanceItem will happily
+    -- build one, so no existence check was ever going to catch it. It is worn
+    -- appearance rather than property, and listing one took it off the player's
+    -- body and put a thing nobody wants on the shelf.
     ok("an applied bandage is not", Market.isListable("Base.Bandage_RightLowerLeg") == false)
-    -- The same shape of thing from a body mod.
-    ok("nor is an appearance pseudo-item", Market.isListable("Base.F_Muscle") == false)
-    ok("nor is anything else the game cannot build", Market.isListable("Base.NotAThing") == false)
+    -- Same family, same flag: the wound overlays and the appearance items that
+    -- body mods add by the hundred.
+    ok("nor is a wound overlay", Market.isListable("Base.ZedDmg_BELLY_Slash") == false)
+    ok("nor is an appearance pseudo-item", Market.isListable("Base.F_Hair_Stubble") == false)
+    -- Kept in the scripts for old saves, not for a market to sell.
+    ok("nor is an obsolete item", Market.isListable("Base.OldRemovedThing") == false)
+    ok("nor is anything the game has never heard of", Market.isListable("Base.NotAThing") == false)
 
     -- The plain bandage is a real item and stays listable: the fix must not
     -- take the whole family with it.
     ok("but a real bandage still is", Market.isListable("Base.Bandage"))
+
+    -- A script object from a mod or an older build may carry neither accessor.
+    -- Refusing everything on that account would be worse than the bug.
+    _G.getScriptManager = function()
+        return {
+            getItem = function(_, fullType)
+                return SCRIPTS[fullType] and {} or nil
+            end
+        }
+    end
+    ok("a script with no flags to ask is still listable", Market.isListable("Base.Axe"))
 
     _G.getScriptManager = nil
     -- No manager at all is refused rather than waved through, since nothing can
