@@ -252,6 +252,33 @@ local function isSellerSearch(ui)
     return type(search) == "string" and search:sub(1, 1) == "@" and #search > 1
 end
 
+--- Who is behind one item type: a name when only one person is selling it, and
+--- a count when several are.
+---
+--- Counted over the browse reply's flat listings rather than asked of the
+--- server, because the client already holds every active listing and the
+--- summary row this stands beside was made from that same set. Keyed on the
+--- account rather than the character name, so one person with four axes up is
+--- one seller, and two players who happen to share a first name are two.
+---
+--- A listing carrying no seller at all is left out rather than counted as an
+--- unknown one, so a market of them says nothing about sellers instead of
+--- claiming a number it cannot stand behind.
+local function sellersOf(fullType)
+    local seen, count, name = {}, 0, nil
+    for _, row in ipairs((Client.data.browse and Client.data.browse.listings) or {}) do
+        if row.fullType == fullType then
+            local who = row.seller or row.sellerChar
+            if who and not seen[who] then
+                seen[who] = true
+                count = count + 1
+                name = name or (row.sellerChar or row.seller)
+            end
+        end
+    end
+    return count, name
+end
+
 Core.registerShopMode({
     key = "market",
     label = "IGUI_PhleaMarket_Mode_Buy",
@@ -416,6 +443,11 @@ Core.registerShopMode({
     --- figure is the lowest anybody is asking and the count is spread across
     --- several sellers. Saying so is the difference between a figure and a
     --- misleading one, and it is what makes a type worth opening -- or not.
+    ---
+    --- Who is selling belongs here for the same reason. It is the other half of
+    --- what opening a type would tell you, and on the common case of one person
+    --- holding every listing of something, it is the half that decides whether
+    --- the type is worth opening at all.
     detailLines = function(ui, offer)
         if groupOf(ui) or isSellerSearch(ui) then
             -- A single listing. Who is selling it is the useful fact here, and
@@ -435,20 +467,41 @@ Core.registerShopMode({
         end
         for _, row in ipairs((Client.data.browse and Client.data.browse.rows) or {}) do
             if row.fullType == fullType then
+                local sellers, only = sellersOf(fullType)
+                local lines
+
                 -- One listing is worth saying outright. It is the case that
                 -- looks oddest after opening -- a page holding a single row --
                 -- and knowing beforehand turns that from a surprise into what
                 -- was expected.
                 if row.listings == 1 then
-                    return {{
+                    lines = {{
                         text = getText("IGUI_PhleaMarket_OneListing")
                     }}
+                else
+                    lines = {{
+                        text = getText("IGUI_PhleaMarket_FromPrice",
+                            Market.formatAmount(Market.currencyPool(), row.low))
+                    }, {
+                        text = getText("IGUI_PhleaMarket_AcrossListings", tostring(row.listings))
+                    }}
                 end
-                return {{
-                    text = getText("IGUI_PhleaMarket_FromPrice", Market.formatAmount(Market.currencyPool(), row.low))
-                }, {
-                    text = getText("IGUI_PhleaMarket_AcrossListings", tostring(row.listings))
-                }}
+
+                -- Who, in the same words the listing itself will use once the
+                -- type is opened. A single seller is named rather than counted:
+                -- four listings all from one person is a different market from
+                -- four listings from four, and the name is the fact a player
+                -- would otherwise open the type to find out.
+                if sellers == 1 and only then
+                    table.insert(lines, {
+                        text = getText("IGUI_PhleaMarket_SoldBy", only)
+                    })
+                elseif sellers > 1 then
+                    table.insert(lines, {
+                        text = getText("IGUI_PhleaMarket_SellerCount", tostring(sellers))
+                    })
+                end
+                return lines
             end
         end
         return nil
