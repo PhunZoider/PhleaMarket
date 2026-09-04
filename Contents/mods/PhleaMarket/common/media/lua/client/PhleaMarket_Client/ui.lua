@@ -83,8 +83,15 @@ function UI.successText(payload)
         -- Says what is still waiting rather than only what arrived. A collect
         -- that leaves money behind because the wallet is full otherwise looks
         -- like a collect that did nothing.
-        if (payload.stillHeld or 0) > 0 then
-            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount(Market.currencyPool(), payload.stillHeld))
+        --
+        -- Only when there is a whole unit of it to name. On an item currency a
+        -- remainder is usually a fraction of one item, left behind by
+        -- commission and waiting for the next sale to complete it. Reporting
+        -- that as "0 Money still held" describes accounting dust as a problem,
+        -- and the collect it is attached to actually worked.
+        local pool = Market.currencyPool()
+        if (payload.stillHeld or 0) >= Market.poolScale(pool) then
+            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount(pool, payload.stillHeld))
         end
         if (payload.keptBack or 0) > 0 then
             return getText("IGUI_PhleaMarket_Msg_CollectedNoRoom")
