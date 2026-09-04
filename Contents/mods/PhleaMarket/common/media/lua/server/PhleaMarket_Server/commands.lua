@@ -646,6 +646,33 @@ Commands[C.adminCancel] = function(playerObj, args)
     })
 end
 
+Commands[C.adminCancelAll] = function(playerObj, args)
+    if not Core.utils.isAdmin(playerObj) then
+        return
+    end
+    local store = Store.get()
+    local result = Listings.cancelAll(store, nameOf(playerObj), Store.now())
+
+    -- One ledger entry rather than one per listing. A hundred rows saying the
+    -- same thing at the same second buries whatever else is in the log, and the
+    -- thing worth being able to look up later is that somebody cleared the
+    -- board and how much was on it.
+    Store.log({
+        event = Listings.EVENT.ADMIN_CANCEL,
+        actor = nameOf(playerObj),
+        qty = result.cancelled,
+        held = result.dropped
+    })
+    Store.save()
+
+    Store.respond(playerObj, C.result, {
+        ok = true,
+        action = "adminCancelAll",
+        cancelled = result.cancelled,
+        dropped = result.dropped
+    })
+end
+
 Commands[C.adminLog] = function(playerObj, args)
     if not Core.utils.isAdmin(playerObj) then
         return

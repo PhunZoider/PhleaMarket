@@ -536,6 +536,73 @@ function Listings.dropSimulatedNotIn(store, pool)
     return dropped
 end
 
+--- Take everything off the market at once.
+---
+--- The bulk form of cancel, for an admin clearing the board: after a currency
+--- change, before a wipe, or when a market has filled with something that
+--- should not be on it. Doing it a row at a time through the ledger is the same
+--- work spread over as many confirmations as there are listings.
+---
+--- Goods go back to their sellers exactly as a single pull does. An admin
+--- pulling a listing is removing it from sale, not confiscating it, and that
+--- does not stop being true because they pulled a hundred at once.
+---
+--- Simulated listings are deleted rather than returned. There is no wallet
+--- behind the name and nobody who will ever walk up to a machine to empty the
+--- queue, so returning them would pile goods under a survivor who does not
+--- exist. Same rule expiry already follows.
+---
+--- Indices are rebuilt once at the end rather than per listing, which is the
+--- only reason this is not simply a loop over cancel().
+---
+--- Returns a summary: how many went back to sellers, how many fake ones were
+--- dropped, and the per-seller counts so the caller can say who was affected.
+function Listings.cancelAll(store, by, nowHours)
+    local now = tonumber(nowHours) or 0
+    local cancelled, dropped = 0, 0
+    local bySeller = {}
+
+    for id, listing in pairs(store.listings or {}) do
+        if listing.status == Listings.STATUS.ACTIVE then
+            if listing.simulated then
+                store.listings[id] = nil
+                dropped = dropped + 1
+            else
+                listing.status = Listings.STATUS.CANCELLED
+                local remaining = listing.qty
+                listing.qty = 0
+
+                local ret = Listings.addReturn(store, listing.seller, {
+                    snapshot = listing.snapshot,
+                    fullType = listing.fullType,
+                    itemName = listing.itemName,
+                    qty = remaining,
+                    unitPrice = listing.unitPrice,
+                    listingId = id,
+                    reason = Listings.REASON.ADMIN
+                })
+                if ret then
+                    ret.at = now
+                end
+
+                cancelled = cancelled + 1
+                bySeller[listing.seller] = (bySeller[listing.seller] or 0) + 1
+            end
+        end
+    end
+
+    if cancelled + dropped > 0 then
+        Listings.rebuildIndices(store)
+    end
+
+    return {
+        cancelled = cancelled,
+        dropped = dropped,
+        sellers = bySeller,
+        by = by
+    }
+end
+
 --- Drop finished listings, and returns nobody came back for.
 ---
 --- Both are needed. Without the first the store carries every completed sale

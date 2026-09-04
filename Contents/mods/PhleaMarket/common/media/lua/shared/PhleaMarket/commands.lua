@@ -27,6 +27,7 @@ PhleaMarket.commands = {
     -- Admin
     adminList = "PhleaAdminList",
     adminCancel = "PhleaAdminCancel",
+    adminCancelAll = "PhleaAdminCancelAll",
     adminLog = "PhleaAdminLog",
 
     -- Server to player

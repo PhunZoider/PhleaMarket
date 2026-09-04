@@ -963,6 +963,49 @@ do
     ok("a second pass finds nothing", L.dropSimulatedNotIn(store, ITEM) == 0)
 end
 
+
+print("-- clearing the whole market --")
+do
+    local store = L.newStore()
+    local steveA = list(store, {seller = "steve", fullType = "Base.Nails"})
+    local steveB = list(store, {seller = "steve", fullType = "Base.Axe"})
+    local dave = list(store, {seller = "dave", fullType = "Base.Saw"})
+    local fake = list(store, {seller = "nobody", simulated = true})
+
+    -- Something already finished, which the sweep must not touch: it has been
+    -- through its own ending already and returning it again would hand the
+    -- seller a second copy.
+    local gone = list(store, {seller = "steve", fullType = "Base.Hammer"})
+    L.cancel(store, gone.id, "steve")
+
+    local result = L.cancelAll(store, "admin", 2000)
+
+    ok("three real listings came off", result.cancelled == 3, tostring(result.cancelled))
+    ok("and the fake one was dropped, not returned", result.dropped == 1, tostring(result.dropped))
+    ok("the fake listing is gone from the store", L.get(store, fake.id) == nil)
+    ok("nothing was queued under a seller who does not exist",
+        #L.peekReturns(store, "nobody").items == 0)
+
+    -- An admin clearing the board is taking listings off sale, not confiscating
+    -- them. Three of Steve's went in: two from this sweep and one he cancelled
+    -- himself earlier.
+    ok("steve gets both of his back", #L.peekReturns(store, "steve").items == 3,
+        tostring(#L.peekReturns(store, "steve").items))
+    ok("and dave gets his", #L.peekReturns(store, "dave").items == 1)
+    ok("nothing goes to the admin", #L.peekReturns(store, "admin").items == 0)
+
+    ok("counted per seller", result.sellers.steve == 2 and result.sellers.dave == 1,
+        tostring(result.sellers.steve) .. "/" .. tostring(result.sellers.dave))
+    ok("the listings are marked cancelled", L.get(store, steveA.id).status == L.STATUS.CANCELLED)
+    ok("with nothing left on them", L.get(store, steveB.id).qty == 0 and L.get(store, dave.id).qty == 0)
+    ok("and none are active any more", countActive(store) == 0, tostring(countActive(store)))
+
+    -- Runs on an empty board without inventing work, since the button does not
+    -- know whether anything is on it.
+    local again = L.cancelAll(store, "admin", 2001)
+    ok("a second sweep finds nothing", again.cancelled == 0 and again.dropped == 0)
+    ok("and does not return anything twice", #L.peekReturns(store, "steve").items == 3)
+end
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)
 if failed > 0 then

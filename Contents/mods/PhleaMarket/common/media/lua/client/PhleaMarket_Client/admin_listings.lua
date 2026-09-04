@@ -131,6 +131,9 @@ function UI:createChildren()
 
     self:addBottomButton(getText("IGUI_PhleaMarket_Adm_Refresh"), self.onRefresh)
     self:addBottomButton(getText("IGUI_PhleaMarket_Adm_Pull"), self.onPull, true)
+    -- No selection required: it is the one action here that is about the board
+    -- rather than about a row.
+    self:addBottomButton(getText("IGUI_PhleaMarket_Adm_PullAll"), self.onPullAll)
 end
 
 --- Ask the server for what this panel is showing.
@@ -281,6 +284,36 @@ function UI:onPullConfirm(button, listingId)
     Client.send(C.adminCancel, {
         listingId = listingId
     })
+end
+
+function UI:onPullAll()
+    -- Counted before asking, because "clear the market" means something very
+    -- different with three listings on it than with three hundred, and an admin
+    -- deserves to know which one they are about to do.
+    local active = 0
+    for _, listing in ipairs(self.listings or {}) do
+        if listing.status == Listings.STATUS.ACTIVE then
+            active = active + 1
+        end
+    end
+    if active == 0 then
+        return
+    end
+
+    local w = math.floor(400 * ListPanel.FONT_SCALE)
+    local h = math.floor(170 * ListPanel.FONT_SCALE)
+    local modal = ISModalDialog:new((getCore():getScreenWidth() - w) / 2, (getCore():getScreenHeight() - h) / 2, w, h,
+        getText("IGUI_PhleaMarket_Adm_PullAllConfirm", tostring(active)), true, self, UI.onPullAllConfirm,
+        self.player:getPlayerNum())
+    modal:initialise()
+    modal:addToUIManager()
+end
+
+function UI:onPullAllConfirm(button)
+    if button.internal ~= "YES" then
+        return
+    end
+    Client.send(C.adminCancelAll, {})
 end
 
 ---------------------------------------------------------------------------

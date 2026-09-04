@@ -74,6 +74,11 @@ function UI.successText(payload)
         return getText("IGUI_PhleaMarket_Msg_Cancelled")
     elseif payload.action == "adminCancel" then
         return getText("IGUI_PhleaMarket_Msg_Cancelled")
+    elseif payload.action == "adminCancelAll" then
+        -- Says the number, because clearing a board an admin believed was empty
+        -- and clearing one with two hundred listings on it look identical
+        -- otherwise, and only one of those wants checking.
+        return getText("IGUI_PhleaMarket_Msg_CancelledAll", tostring(payload.cancelled or 0))
     elseif payload.action == "collect" then
         -- Says what is still waiting rather than only what arrived. A collect
         -- that leaves money behind because the wallet is full otherwise looks
