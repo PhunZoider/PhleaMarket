@@ -30,6 +30,11 @@ _G.PhunMart = {
     },
     shopDefPassthrough = {},
     wallet = {
+        -- Answers no to everything: the currency question has its own tests and
+        -- this one only has to not be nil.
+        isCurrency = function()
+            return false
+        end,
         pools = {
             change = {
                 label = "Change",
@@ -463,6 +468,58 @@ do
     ok("the named form is unchanged", Market.formatAmount(ITEM, 17500) == "175 Money")
 
     _G.PhunMart.currencyDef = nil
+end
+
+print("-- what may be listed at all --")
+do
+    -- A script manager shaped like the real one: getItem is strict and takes a
+    -- full type, FindItem is lenient and will answer for a name that is not a
+    -- real type by falling back to one that is. That leniency is the bug this
+    -- pins, so the mock has to have it or the test proves nothing.
+    local REAL = {
+        ["Base.Axe"] = true,
+        ["Base.Bandage"] = true
+    }
+    _G.getScriptManager = function()
+        return {
+            getItem = function(_, fullType)
+                return REAL[fullType] and {
+                    type = fullType
+                } or nil
+            end,
+            FindItem = function(_, name)
+                if REAL[name] then
+                    return {
+                        type = name
+                    }
+                end
+                -- The fallback: Base.Bandage_RightLowerLeg finds Base.Bandage.
+                local stem = name and name:match("^(.-)_")
+                return stem and REAL[stem] and {
+                    type = stem
+                } or nil
+            end
+        }
+    end
+
+    ok("a real item is listable", Market.isListable("Base.Axe"))
+
+    -- An applied bandage reports this as its type. It cannot be built again, so
+    -- listing one escrowed it off the player's body and left it unrecoverable
+    -- by either side.
+    ok("an applied bandage is not", Market.isListable("Base.Bandage_RightLowerLeg") == false)
+    -- The same shape of thing from a body mod.
+    ok("nor is an appearance pseudo-item", Market.isListable("Base.F_Muscle") == false)
+    ok("nor is anything else the game cannot build", Market.isListable("Base.NotAThing") == false)
+
+    -- The plain bandage is a real item and stays listable: the fix must not
+    -- take the whole family with it.
+    ok("but a real bandage still is", Market.isListable("Base.Bandage"))
+
+    _G.getScriptManager = nil
+    -- No manager at all is refused rather than waved through, since nothing can
+    -- be verified and escrow is the thing on the other side of this.
+    ok("no script manager means nothing is listable", Market.isListable("Base.Axe") == false)
 end
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)

@@ -604,11 +604,25 @@ function Market.isListable(fullType)
         return false
     end
 
+    -- Unknown to the game: refuse rather than escrow something that cannot be
+    -- built again.
+    --
+    -- getItem and not FindItem, which is the whole of a bug worth writing down.
+    -- FindItem is the lenient lookup and will resolve a name that is not a real
+    -- type by falling back to one that is: an applied bandage reports its type
+    -- as Base.Bandage_RightLowerLeg, which FindItem happily answers for and
+    -- getItem does not. So this gate passed, the item was escrowed off the
+    -- player's body, and then Snapshot.restore -- which asks getItem, strictly,
+    -- and always has -- could never build it back. Neither the buyer nor the
+    -- seller could ever get it: a listing that ate the item.
+    --
+    -- The two have to ask the same question. This one asks restore's.
     local manager = type(getScriptManager) == "function" and getScriptManager()
-    local script = manager and manager:FindItem(fullType)
-    if not script then
-        -- Unknown to the game: refuse rather than escrow something that cannot
-        -- be built again.
+    if not manager or type(manager.getItem) ~= "function" then
+        return false
+    end
+    local ok, script = pcall(manager.getItem, manager, fullType)
+    if not ok or not script then
         return false
     end
 
