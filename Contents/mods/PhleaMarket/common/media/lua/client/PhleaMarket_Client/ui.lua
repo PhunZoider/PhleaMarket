@@ -351,6 +351,40 @@ function Dialog:values()
     return Market.snapPrice(price), math.floor(qty)
 end
 
+--- Draw a line that ends in a figure, with the currency's icon after it.
+---
+--- The icon goes after the text rather than inside it, which is why several of
+--- these strings were reworded to finish on their number: a texture cannot be
+--- placed mid-sentence, but a line that ends on its figure can have one drawn
+--- at the end of it.
+---
+--- Falls back to naming the currency in words when there is no icon, which is
+--- every change-pool server and any item whose script did not load. Nothing
+--- here assumes an item currency; it just reads better on one.
+function Dialog:drawWithIcon(text, x, y, r, g, b)
+    self:drawText(text, x, y, r, g, b, 1, UIFont.Small)
+    local tex = Market.currencyTexture(self.pool)
+    if tex then
+        local w = getTextManager():MeasureStringX(UIFont.Small, text)
+        self:drawTextureScaledAspect(tex, x + w + math.floor(3 * FS), y, FONT_SM, FONT_SM, 1, 1, 1, 1)
+    end
+end
+
+--- The same for a line that is only one figure and its label.
+function Dialog:drawMoney(key, amount, x, y, r, g, b)
+    local figure = self:figure(amount)
+    self:drawWithIcon(key and getText(key, figure) or figure, x, y, r, g, b)
+end
+
+--- A figure written the way this dialog is about to draw it: bare when an icon
+--- will follow it, named in words when none will.
+function Dialog:figure(amount)
+    if Market.currencyTexture(self.pool) then
+        return Market.amountFigure(self.pool, amount)
+    end
+    return Market.formatAmount(self.pool, amount)
+end
+
 function Dialog:render()
     ISPanel.render(self)
     local pad = math.floor(12 * FS)
@@ -397,25 +431,29 @@ function Dialog:render()
     local tooLow = price < (limits.minPrice or 0)
     local tooHigh = price > (limits.maxPrice or math.huge)
     if (limits.minPrice or 0) > 0 or tooHigh then
+        -- Every figure on this line is the same currency, so one icon after the
+        -- whole line speaks for all of them rather than three in a row.
+        local function fmt(_, amount)
+            return self:figure(amount)
+        end
         local text, r, g, b
         if tooLow then
-            text = getText("IGUI_PhleaMarket_RangeTooLow", Market.formatAmount(pool, limits.minPrice))
+            text = getText("IGUI_PhleaMarket_RangeTooLow", fmt(pool, limits.minPrice))
             r, g, b = 0.95, 0.45, 0.4
         elseif tooHigh then
-            text = getText("IGUI_PhleaMarket_RangeTooHigh", Market.formatAmount(pool, limits.maxPrice))
+            text = getText("IGUI_PhleaMarket_RangeTooHigh", fmt(pool, limits.maxPrice))
             r, g, b = 0.95, 0.45, 0.4
         elseif (limits.step or 1) > 1 then
             -- The step is said here rather than left to be discovered by typing
             -- a figure and watching it change into a different one.
-            text = getText("IGUI_PhleaMarket_RangeStep", Market.formatAmount(pool, limits.minPrice),
-                Market.formatAmount(pool, limits.maxPrice), Market.formatAmount(pool, limits.step))
+            text = getText("IGUI_PhleaMarket_RangeStep", fmt(pool, limits.minPrice), fmt(pool, limits.maxPrice),
+                fmt(pool, limits.step))
             r, g, b = 0.55, 0.55, 0.55
         else
-            text = getText("IGUI_PhleaMarket_Range", Market.formatAmount(pool, limits.minPrice),
-                Market.formatAmount(pool, limits.maxPrice))
+            text = getText("IGUI_PhleaMarket_Range", fmt(pool, limits.minPrice), fmt(pool, limits.maxPrice))
             r, g, b = 0.55, 0.55, 0.55
         end
-        self:drawText(text, pad, self.rangeY, r, g, b, 1, UIFont.Small)
+        self:drawWithIcon(text, pad, self.rangeY, r, g, b)
     end
 
     -- Out of range cannot be listed, so the button says so by being dead. The
@@ -427,22 +465,24 @@ function Dialog:render()
     -- dollars, so this is no longer translating a unit at the player; it is
     -- what confirms the step, since a figure typed between steps comes down and
     -- this is where that is visible.
-    self:drawText(Market.formatAmount(pool, price), self.priceBox:getX() - math.floor(64 * FS),
-        priceY + math.floor(4 * FS), 0.6, 0.85, 0.6, 1, UIFont.Small)
+    self:drawMoney(nil, price, self.priceBox:getX() - math.floor(72 * FS), priceY + math.floor(4 * FS), 0.6, 0.85,
+        0.6)
 
     local y = self.feeY
-    self:drawText(getText("IGUI_PhleaMarket_AskingTotal", Market.formatAmount(pool, total)), pad, y, 0.85, 0.85,
-        0.85, 1, UIFont.Small)
+    self:drawMoney("IGUI_PhleaMarket_AskingTotal", total, pad, y, 0.85, 0.85, 0.85)
     y = y + FONT_SM + math.floor(2 * FS)
     -- Named as non-refundable, because it is: cancelling a listing returns the
     -- goods and not the fee, and that is better learned before paying it.
     local feeKey = fee > 0 and "IGUI_PhleaMarket_FeeNow" or "IGUI_PhleaMarket_FeeFree"
-    self:drawText(getText(feeKey, Market.formatAmount(pool, fee)), pad, y, 0.9, 0.75, 0.4, 1, UIFont.Small)
+    if fee > 0 then
+        self:drawMoney(feeKey, fee, pad, y, 0.9, 0.75, 0.4)
+    else
+        self:drawText(getText(feeKey), pad, y, 0.9, 0.75, 0.4, 1, UIFont.Small)
+    end
     y = y + FONT_SM + math.floor(2 * FS)
     -- Take-home, not the asking price. The number a seller actually cares about
     -- is what lands in their wallet if it all sells.
-    self:drawText(getText("IGUI_PhleaMarket_YouGet", Market.formatAmount(pool, total - commission)), pad, y, 0.5,
-        0.9, 0.5, 1, UIFont.Small)
+    self:drawMoney("IGUI_PhleaMarket_YouGet", total - commission, pad, y, 0.5, 0.9, 0.5)
 
     -- What anybody would want to know before naming a figure: what the market
     -- is asking for one of these, what it has actually been paying, and what
@@ -464,9 +504,10 @@ function Dialog:render()
 
         local guide = info.guide
         if guide then
-            self:drawText(getText("IGUI_PhleaMarket_Listed", Market.formatAmount(pool, guide.low),
-                Market.formatAmount(pool, guide.high), tostring(guide.count)), pad, y, 0.7, 0.75, 0.85, 1,
-                UIFont.Small)
+            -- Reworded so it ends on a figure: the count moved to the front so
+            -- the icon has somewhere to sit.
+            self:drawWithIcon(getText("IGUI_PhleaMarket_Listed", tostring(guide.count), self:figure(guide.low),
+                self:figure(guide.high)), pad, y, 0.7, 0.75, 0.85)
         else
             self:drawText(getText("IGUI_PhleaMarket_NoneListed"), pad, y, 0.55, 0.55, 0.55, 1, UIFont.Small)
         end
@@ -479,18 +520,16 @@ function Dialog:render()
             -- were only three.
             local parts = {}
             for i = 1, math.min(#sold, 3) do
-                table.insert(parts, Market.formatAmount(pool, sold[i].unit))
+                table.insert(parts, self:figure(sold[i].unit))
             end
-            self:drawText(getText("IGUI_PhleaMarket_SoldFor", table.concat(parts, ", ")), pad, y, 0.7, 0.75, 0.85, 1,
-                UIFont.Small)
+            self:drawWithIcon(getText("IGUI_PhleaMarket_SoldFor", table.concat(parts, ", ")), pad, y, 0.7, 0.75, 0.85)
         else
             self:drawText(getText("IGUI_PhleaMarket_NeverSold"), pad, y, 0.55, 0.55, 0.55, 1, UIFont.Small)
         end
         y = y + FONT_SM + math.floor(2 * FS)
 
         if info.lastAsk then
-            self:drawText(getText("IGUI_PhleaMarket_YouAsked", Market.formatAmount(pool, info.lastAsk)), pad, y, 0.6,
-                0.6, 0.6, 1, UIFont.Small)
+            self:drawMoney("IGUI_PhleaMarket_YouAsked", info.lastAsk, pad, y, 0.6, 0.6, 0.6)
         end
     end
 end

@@ -81,6 +81,26 @@ local function asOffer(id, fullType, unit, pool, qty, meta)
     }
 end
 
+--- A tile with nothing to say about price yet.
+---
+--- The sell tab is a list of what is in the bag, and the seller has not named
+--- a figure for any of it. A price of zero is as invented as any other number
+--- and drew "$0" on every tile and "Price: $0" in the panel beside them. No
+--- price at all draws no badge, which is the honest version of not knowing.
+---
+--- Its own function rather than a nil unit through asOffer, so a real listing
+--- whose price failed to arrive can never quietly land here.
+local function asUnpricedOffer(id, fullType, qty)
+    return {
+        id = id,
+        item = fullType,
+        offer = {
+            qty = 1,
+            stockQty = math.max(0, math.floor(qty or 0))
+        }
+    }
+end
+
 local function emptyGrid(ui)
     return {
         key = ui.data and ui.data.key,
@@ -568,10 +588,9 @@ Core.registerShopMode({
         local rows = cachedListableInventory(ui, ui.player)
         local offers = {}
         for fullType, row in pairs(rows) do
-            -- Priced at nothing: the seller has not said what they want for it
-            -- yet, and showing a made-up figure would be showing them a number
-            -- they did not choose.
-            offers[fullType] = asOffer(fullType, fullType, 0, Market.currencyPool(), row.count)
+            -- The seller has not said what they want for it yet, and showing a
+            -- made-up figure would be showing them a number they did not choose.
+            offers[fullType] = asUnpricedOffer(fullType, fullType, row.count)
         end
         return gridOf(ui, offers)
     end,

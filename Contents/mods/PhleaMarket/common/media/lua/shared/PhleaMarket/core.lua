@@ -398,6 +398,44 @@ function Market.formatAmount(pool, amount)
     return sign .. grouped(amount)
 end
 
+--- The figure alone, without the word for what it is.
+---
+--- For a line that will have the currency's icon drawn after it. The icon is
+--- the word: "175 Money" with a picture of money beside it says the same thing
+--- twice, and on a server paying in nails it says it twice badly, because
+--- "Nails" is both the money and half the things for sale.
+---
+--- The change pool keeps its dollar sign, which is the same idea already: a
+--- symbol standing where the word would be.
+function Market.amountFigure(pool, amount)
+    amount = tonumber(amount) or 0
+    if Market.poolItem(pool) then
+        local sign = amount < 0 and "-" or ""
+        return sign .. grouped(math.floor(math.abs(amount) / Market.ITEM_SCALE))
+    end
+    return Market.formatAmount(pool, amount)
+end
+
+--- The icon for a currency, or nil where there is nothing to draw.
+---
+--- nil for the change pool, which has no item behind it, and nil on a server
+--- whose currency item has no script loaded. Both mean the caller falls back to
+--- naming the currency in words.
+function Market.currencyTexture(pool)
+    local item = Market.poolItem(pool)
+    if not item then
+        return nil
+    end
+    local ok, tex = pcall(function()
+        local si = getScriptManager():getItem(item)
+        return si and si:getNormalTexture() or nil
+    end)
+    if ok then
+        return tex
+    end
+    return nil
+end
+
 --- A figure somebody typed, as a number of pool units.
 ---
 --- The price box is the only place in the market where anybody types money, and

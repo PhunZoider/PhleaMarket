@@ -437,6 +437,33 @@ do
     _G.PhunMart.currencyDef = nil
     options({})
 end
+
+print("-- a figure without the word for it --")
+do
+    local ITEM = "item:Base.Money"
+    _G.PhunMart.currencyDef = function()
+        return {
+            kind = "items",
+            item = "Base.Money"
+        }
+    end
+
+    -- What goes before an icon: the number and nothing else, because the icon
+    -- is the word.
+    ok("an item figure drops the name", Market.amountFigure(ITEM, 17500) == "175")
+    ok("and still groups", Market.amountFigure(ITEM, 1234500) == "12,345")
+    ok("negatives keep their sign", Market.amountFigure(ITEM, -17500) == "-175")
+
+    -- The change pool keeps its dollar sign, which is the same idea: a symbol
+    -- standing where the word would be.
+    ok("change keeps its symbol", Market.amountFigure("change", 250) == "$2.50")
+    ok("a counted pool is bare either way", Market.amountFigure("tokens", 4200) == "4,200")
+
+    -- And the named form still names it, for every line that has no icon.
+    ok("the named form is unchanged", Market.formatAmount(ITEM, 17500) == "175 Money")
+
+    _G.PhunMart.currencyDef = nil
+end
 print("")
 print("passed: " .. passed .. "  failed: " .. failed)
 os.exit(failed == 0 and 0 or 1)
