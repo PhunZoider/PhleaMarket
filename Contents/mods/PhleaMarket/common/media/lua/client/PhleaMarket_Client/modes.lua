@@ -26,6 +26,7 @@ local Core = PhunMart
 local Market = PhleaMarket
 local tools = require "PhunMart_Client/ui/ui_utils"
 local Snapshot = require "PhleaMarket/item_snapshot"
+local Listings = require "PhleaMarket/listings"
 local Client = Market.client
 local C = Market.commands
 local FS = tools.FONT_SCALE
@@ -106,6 +107,15 @@ local function asUnpricedOffer(id, fullType, qty)
             minStockBadge = 2
         }
     }
+end
+
+--- What a pool is called, for the one case where a tile has to stand for money
+--- and there is no currency item to name it after. The raw pool key is the last
+--- resort and is at least true.
+local function poolLabel(pool)
+    pool = pool or "change"
+    local def = Core.wallet and Core.wallet.pools and Core.wallet.pools[pool]
+    return (def and def.label) or pool
 end
 
 local function emptyGrid(ui)
@@ -744,6 +754,34 @@ Core.registerShopMode({
             offers["return:" .. index] = asOffer("return:" .. index, entry.fullType,
                 entry.unitPrice and entry.unitPrice.amount, entry.unitPrice and entry.unitPrice.pool, entry.qty)
         end
+
+        -- Money gets a tile of its own, one per pool, carrying the total.
+        --
+        -- It used to get nothing: the grid drew items and credits were left to
+        -- the Collect button. That was two bugs wearing one coat. A seller
+        -- whose wallet was full when something sold saw an empty Returns tab
+        -- with no hint that anything was owed -- and PhunMart only asks
+        -- canAction when a tile is selected, so with no tile to click the
+        -- button stayed dead and the money could never be collected at all. It
+        -- then aged out of the queue and was purged.
+        --
+        -- A count of one rather than the amount: the figure belongs in the
+        -- price badge, and a stock of nothing is what the grid dims and marks
+        -- sold out.
+        for pool, amount in pairs(Listings.creditTotals(queue)) do
+            -- Everything an ordinary pool holds can be paid out, down to the
+            -- cent. An item pool cannot hand over a fraction of an item, so a
+            -- total under one whole is dust that collect would refuse -- the
+            -- commission on a part sale, waiting for the next one to round it
+            -- up. Drawing it would put a tile reading "0 Money" on the shelf
+            -- and a button that appeared to do nothing.
+            local payable = not Market.poolItem(pool) or amount >= Market.ITEM_SCALE
+            if payable then
+                local id = "credit:" .. pool
+                offers[id] = asOffer(id, Market.poolIcon(pool) or poolLabel(pool), amount, pool, 1)
+            end
+        end
+
         return gridOf(ui, offers)
     end,
 
@@ -756,8 +794,10 @@ Core.registerShopMode({
         if not queue then
             return false
         end
-        -- Live whenever there is anything at all to collect, including money
-        -- with no item beside it, which the grid has no way to show.
+        -- Live whenever there is anything at all to collect, whichever tile is
+        -- selected: Collect empties the whole queue rather than the one thing
+        -- highlighted, so refusing on the strength of the selection would be
+        -- refusing something the button does not act on.
         return (#(queue.items or {}) + #(queue.credits or {})) > 0
     end,
 
@@ -887,7 +927,7 @@ Events[Market.events.OnData].Add(function(kind, payload)
         -- there first" means what is on screen is already wrong and wants
         -- drawing again from what the client last heard.
     elseif kind == "result" then
-        window:showFeedback(Market.ui.successText(payload), 0.4, 0.9, 0.4)
+        window:showFeedback(Market.ui.successText(payload), Market.ui.resultColor(payload))
         -- Something left or entered the bag, so the Sell scan has to be redone.
         window._phleaSell = nil
         -- A sale, a cancel or a collect all change what every mode is showing,

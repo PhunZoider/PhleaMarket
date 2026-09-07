@@ -44,6 +44,30 @@ _G.PhunMart = {
                 label = "Tokens",
                 format = "count"
             }
+        },
+        -- The coins PhunMart ships, because poolIcon picks one of them to
+        -- stand for a pool that has no currency item of its own.
+        currencies = {
+            ["PhunMart.Nickel"] = {
+                pool = "change",
+                value = 5
+            },
+            ["PhunMart.Dime"] = {
+                pool = "change",
+                value = 10
+            },
+            ["PhunMart.Quarter"] = {
+                pool = "change",
+                value = 25
+            },
+            ["PhunMart.Token"] = {
+                pool = "tokens",
+                value = 1
+            }
+        },
+        walletItems = {
+            ["PhunMart.DroppedWallet"] = true,
+            ["PhunMart.Change"] = true
         }
     }
 }
@@ -293,6 +317,29 @@ do
     _G.PhunMart.currencyDef = nil
     options({})
     ok("and on a change server it is still change", Market.feePool() == "change")
+end
+
+print("-- the item a pool is drawn as --")
+do
+    -- Money waiting in a returns queue is shown on a tile, and a tile draws an
+    -- item. Getting nothing back here is what left a seller's proceeds with no
+    -- tile to click and therefore no way to collect them.
+    ok("the change pool is drawn as change", Market.poolIcon("change") == "PhunMart.Change")
+    ok("a pool with only coins takes the largest", Market.poolIcon("tokens") == "PhunMart.Token")
+    ok("an item currency is its own picture", Market.poolIcon("item:Base.Money") == "Base.Money")
+    ok("a pool nothing feeds has no picture", Market.poolIcon("scrip") == nil)
+
+    -- Deterministic, because the tile should not change coin between two
+    -- openings of the same window.
+    local first = Market.poolIcon("change")
+    ok("and the same pool always draws the same thing", Market.poolIcon("change") == first)
+
+    -- The fallback the client leans on: a tile with no texture still draws, so
+    -- an unknown pool must not be an error.
+    local wallet = _G.PhunMart.wallet
+    _G.PhunMart.wallet = nil
+    ok("no wallet at all is nil rather than a crash", Market.poolIcon("change") == nil)
+    _G.PhunMart.wallet = wallet
 end
 
 print("-- price limits on an item currency --")

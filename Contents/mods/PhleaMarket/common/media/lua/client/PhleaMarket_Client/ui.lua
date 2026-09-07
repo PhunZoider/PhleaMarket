@@ -84,21 +84,57 @@ function UI.successText(payload)
         -- that leaves money behind because the wallet is full otherwise looks
         -- like a collect that did nothing.
         --
-        -- Only when there is a whole unit of it to name. On an item currency a
+        -- But it has to know the difference between leaving some behind and
+        -- moving nothing at all. A wallet already at its ceiling collects
+        -- exactly nothing, and every one of these lines used to open with the
+        -- word "Collected", so the window announced a payment against a balance
+        -- the player could see had not changed. That is the same lie the
+        -- toast on a sale was telling, one screen further along.
+        local pool = Market.currencyPool()
+        local held = payload.stillHeld or 0
+        local kept = payload.keptBack or 0
+        local moved = (payload.items or 0) > 0 or (payload.credited or 0) > 0
+
+        -- Named only when there is a whole unit of it. On an item currency a
         -- remainder is usually a fraction of one item, left behind by
         -- commission and waiting for the next sale to complete it. Reporting
-        -- that as "0 Money still held" describes accounting dust as a problem,
-        -- and the collect it is attached to actually worked.
-        local pool = Market.currencyPool()
-        if (payload.stillHeld or 0) >= Market.poolScale(pool) then
-            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount(pool, payload.stillHeld))
+        -- that as "0 Money still held" describes accounting dust as a problem.
+        local worthNaming = held >= Market.poolScale(pool)
+
+        if not moved then
+            if worthNaming then
+                return getText("IGUI_PhleaMarket_Msg_NotCollectedFull", Market.formatAmount(pool, held))
+            end
+            if kept > 0 then
+                return getText("IGUI_PhleaMarket_Msg_NotCollectedNoRoom")
+            end
+            return getText("IGUI_PhleaMarket_Msg_NothingToCollect")
         end
-        if (payload.keptBack or 0) > 0 then
+
+        if worthNaming then
+            return getText("IGUI_PhleaMarket_Msg_CollectedPartial", Market.formatAmount(pool, held))
+        end
+        if kept > 0 then
             return getText("IGUI_PhleaMarket_Msg_CollectedNoRoom")
         end
         return getText("IGUI_PhleaMarket_Msg_Collected")
     end
     return getText("IGUI_PhleaMarket_Msg_Done")
+end
+
+--- The colour a result should be said in.
+---
+--- Amber for one that succeeded without anything actually moving. Collect is
+--- the only command that can: a wallet at its ceiling and a bag with no room
+--- both answer ok having handed over nothing, and saying that in the same green
+--- as a completed sale is the window nodding along with a payment the player can
+--- see did not happen.
+function UI.resultColor(payload)
+    payload = payload or {}
+    if payload.action == "collect" and (payload.items or 0) <= 0 and (payload.credited or 0) <= 0 then
+        return 0.95, 0.8, 0.35
+    end
+    return 0.4, 0.9, 0.4
 end
 
 ---------------------------------------------------------------------------
@@ -117,21 +153,36 @@ local function showNotices(payload)
         return
     end
 
-    local total, items = 0, 0
+    local total, items, held = 0, 0, 0
     for _, notice in ipairs(notices) do
         total = total + (notice.net or 0)
         items = items + (notice.qty or 1)
+        held = held + (notice.held or 0)
     end
     local missed = payload.missed or 0
+    local pool = Market.currencyPool()
 
     local text
     if #notices == 1 and missed == 0 then
         local one = notices[1]
         text = getText("IGUI_PhleaMarket_SoldOne", tostring(one.qty or 1), tostring(one.itemName or "?"),
-            Market.formatAmount(Market.currencyPool(), one.net or 0))
+            Market.formatAmount(pool, one.net or 0))
     else
         text = getText("IGUI_PhleaMarket_SoldMany", tostring(#notices + missed), tostring(items),
-            Market.formatAmount(Market.currencyPool(), total))
+            Market.formatAmount(pool, total))
+    end
+
+    -- What the sale came to is not always what reached the wallet: anything
+    -- over the ceiling waits in Returns. Saying only the first number told a
+    -- seller they had been paid in full and left them to notice the shortfall
+    -- in their balance, which is what "I sold it and never got the money"
+    -- actually was.
+    --
+    -- Named only once there is a whole unit of it, the same rule the collect
+    -- message follows: a fraction of an item held back by commission is dust,
+    -- and the tile in Returns carries the exact figure either way.
+    if held >= Market.poolScale(pool) then
+        text = text .. " " .. getText("IGUI_PhleaMarket_SoldHeld", Market.formatAmount(pool, held))
     end
 
     local toast = Core.ui and Core.ui.toast

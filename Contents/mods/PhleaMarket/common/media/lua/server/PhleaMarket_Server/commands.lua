@@ -248,7 +248,19 @@ Commands[C.buy] = function(playerObj, args)
     -- wandered off should do.
     local paid, held = 0, 0
     if not sale.simulated then
-        paid, held = Store.creditCapped(sale.seller, sale.pool, sale.net)
+        -- Found once and used for both the money and the message.
+        --
+        -- The money needs it as much as the notice does. An item currency can
+        -- only be counted into the hands of somebody standing here, and this is
+        -- how creditCapped is told that somebody is: a name is a seller who is
+        -- not. Passing the name unconditionally meant every sale on an item
+        -- currency paid out nothing and queued the whole amount, including to a
+        -- seller watching it happen. Collect would still have paid it -- that
+        -- path hands over a player -- but a market where being present and
+        -- being away are the same thing is not what any of this describes.
+        local seller = Core.utils.getPlayerByUsername(sale.seller, true)
+
+        paid, held = Store.creditCapped(seller or sale.seller, sale.pool, sale.net)
         if held > 0 then
             Listings.addCredit(store, sale.seller, sale.pool, held, Listings.REASON.WALLET_FULL, sale.listingId,
                 Store.now())
@@ -270,7 +282,6 @@ Commands[C.buy] = function(playerObj, args)
                 held = held,
                 at = Store.now()
             }
-            local seller = Core.utils.getPlayerByUsername(sale.seller, true)
             if seller then
                 Store.respond(seller, C.noticesData, {
                     notices = {notice},

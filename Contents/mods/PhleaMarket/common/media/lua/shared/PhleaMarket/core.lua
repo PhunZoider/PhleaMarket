@@ -312,6 +312,50 @@ function Market.poolItemLabel(item)
     return item:match("%.(.+)$") or item
 end
 
+--- An item type to draw when a pool itself has to appear on a tile.
+---
+--- Money waiting in a returns queue has to be shown as something, and the item
+--- grid draws an item. This picks one that already exists rather than inventing
+--- a label and an icon: whatever comes back has a real name and a real texture
+--- the moment the script manager has it.
+---
+--- An item currency is its own answer. The change pool has PhunMart.Change,
+--- which exists for exactly this -- a quantity of change, as opposed to one
+--- named coin. Any other wallet pool falls back to the largest coin feeding it,
+--- so a server that has added a pool of its own gets that pool's own currency
+--- rather than nothing.
+---
+--- nil is a valid answer, and the grid handles it: a tile with no texture draws
+--- the first letters of its name instead. It is still a tile, and being able to
+--- click the thing is the point.
+function Market.poolIcon(pool)
+    local item = Market.poolItem(pool)
+    if item then
+        return item
+    end
+
+    local wallet = Core.wallet
+    if not wallet then
+        return nil
+    end
+    if (pool or "change") == "change" and wallet.walletItems and wallet.walletItems["PhunMart.Change"] then
+        return "PhunMart.Change"
+    end
+
+    -- Largest first, and the type name to break a tie, so the same pool always
+    -- draws the same coin rather than whatever pairs happened to reach first.
+    local best, bestValue
+    for coin, def in pairs(wallet.currencies or {}) do
+        if def.pool == pool then
+            local value = tonumber(def.value) or 0
+            if not best or value > bestValue or (value == bestValue and coin < best) then
+                best, bestValue = coin, value
+            end
+        end
+    end
+    return best
+end
+
 --- Whether a pool is counted in something finer than the unit it is spoken in.
 ---
 --- The change pool is: it is counted in cents and spoken in dollars, so a

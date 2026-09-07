@@ -491,7 +491,14 @@ function Listings.expireDue(store, nowHours)
                     qty = remaining,
                     unitPrice = listing.unitPrice,
                     listingId = id,
-                    reason = Listings.REASON.EXPIRED
+                    reason = Listings.REASON.EXPIRED,
+                    -- Stamped here rather than by the caller, the way cancel
+                    -- does it. Left off, addReturn defaults it to hour zero and
+                    -- purge reads that as abandoned since the beginning of the
+                    -- world: on any save older than ReturnsExpiryHours the very
+                    -- tick that expired a listing then destroyed what it handed
+                    -- back, before the seller could be told it had expired.
+                    at = now
                 })
             end
             table.insert(expired, listing)
@@ -707,6 +714,28 @@ function Listings.addCredit(store, username, pool, amount, reason, listingId, no
     }
     table.insert(queueFor(store, username).credits, entry)
     return entry
+end
+
+--- What a returns queue is holding in money, totalled per pool.
+---
+--- Credits are queued one per sale, so a seller who has been at the ceiling for
+--- a week has a row for each. What they want to know, and what a tile can show,
+--- is the one figure per pool. Pools are kept apart because they are different
+--- money and never add up: change and tokens in one total is a number that
+--- describes nothing.
+---
+--- Takes the queue rather than the store and the name, so a client holding only
+--- its own queue can ask as readily as the server can.
+function Listings.creditTotals(queue)
+    local totals = {}
+    for _, entry in ipairs((queue or {}).credits or {}) do
+        local amount = math.floor(tonumber(entry.amount) or 0)
+        if amount > 0 then
+            local pool = entry.pool or "change"
+            totals[pool] = (totals[pool] or 0) + amount
+        end
+    end
+    return totals
 end
 
 --- What is waiting for someone, without taking it.

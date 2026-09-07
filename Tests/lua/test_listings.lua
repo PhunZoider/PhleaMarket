@@ -491,6 +491,61 @@ do
     ok("and the listing says how much went back", listing.returned == 3, tostring(listing.returned))
 end
 
+print("-- an expired listing's goods are stamped with the hour they went back --")
+do
+    -- The bug this catches destroyed items silently and only on old saves.
+    -- expireDue queued the return without an `at`, addReturn defaulted that to
+    -- zero, and purge read zero as "abandoned since the beginning of the
+    -- world". The tick expires and then purges, so on any save past
+    -- ReturnsExpiryHours the same tick that took a listing off the shelf threw
+    -- away what it handed back, before the seller could even be told.
+    local store = L.newStore()
+    list(store, {
+        nowHours = 5000,
+        durationHours = 10
+    })
+    L.expireDue(store, 5010)
+
+    local items = L.peekReturns(store, "steve").items
+    ok("the return knows when it was made", items[1] and items[1].at == 5010, items[1] and tostring(items[1].at))
+
+    -- Exactly what the tick does next, on a world long past the expiry window.
+    local _, abandoned = L.purge(store, 5010, {
+        returnsAfterHours = 336
+    })
+    ok("so the same tick does not purge it", abandoned == 0)
+    ok("and the seller still has it waiting", #L.peekReturns(store, "steve").items == 1)
+
+    -- Still goes when it really has been left, so the sweep has not been
+    -- turned into a no-op.
+    _, abandoned = L.purge(store, 5400, {
+        returnsAfterHours = 336
+    })
+    ok("but it goes once nobody comes for it", abandoned == 1)
+end
+
+print("-- what a returns queue is holding in money --")
+do
+    local store = L.newStore()
+    L.addCredit(store, "steve", "change", 400, L.REASON.WALLET_FULL, "pm_00001", 1000)
+    L.addCredit(store, "steve", "change", 150, L.REASON.WALLET_FULL, "pm_00002", 1010)
+    L.addCredit(store, "steve", "tokens", 3, L.REASON.SALE, "pm_00003", 1020)
+
+    local totals = L.creditTotals(L.peekReturns(store, "steve"))
+    ok("one figure per pool, not one per sale", totals.change == 550, tostring(totals.change))
+    ok("and pools are never added together", totals.tokens == 3, tostring(totals.tokens))
+
+    local function poolCount(t)
+        local n = 0
+        for _ in pairs(t) do
+            n = n + 1
+        end
+        return n
+    end
+    ok("nobody owed anything has nothing to total", poolCount(L.creditTotals(L.peekReturns(store, "dave"))) == 0)
+    ok("and neither does nothing at all", poolCount(L.creditTotals(nil)) == 0)
+end
+
 print("-- a listing that sold out has nothing to return --")
 do
     local store = L.newStore()
