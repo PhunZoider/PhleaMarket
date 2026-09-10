@@ -378,6 +378,36 @@ end
 -- Talking back
 ---------------------------------------------------------------------------
 
+--- Tell a player's client what their wallet now holds.
+---
+--- The balance a player reads is drawn from their own client's copy of the
+--- wallet, not from the server's. Every PhunMart path that moves a balance
+--- server-side pushes the record back afterwards -- a coin pickup, a purchase,
+--- an admin edit -- and nothing here ever did. So the money moved and the
+--- number on screen did not: a buyer watched their balance sit still through a
+--- purchase and reported not being charged, and a seller was only convinced
+--- otherwise by the toast. It corrected itself at the next login, which is what
+--- kept it looking like a market that does not take money rather than a window
+--- that does not update.
+---
+--- Sent as PhunMart's own getWallet, so its client handler files it the way
+--- every other sync is filed and there is nothing to keep in step here.
+---
+--- Singleplayer shares one table between the two halves, so there is nothing to
+--- send and nothing that can be stale.
+function Store.syncWallet(playerObj)
+    if Core.isLocal then
+        return
+    end
+    if not (playerObj and playerObj.getUsername) then
+        return
+    end
+    sendServerCommand(playerObj, Core.name, Core.commands.getWallet, {
+        username = playerObj:getUsername(),
+        wallet = Core.wallet:get(playerObj)
+    })
+end
+
 --- Answer a player.
 ---
 --- sendServerCommand is a no-op in singleplayer, so a reply sent that way there

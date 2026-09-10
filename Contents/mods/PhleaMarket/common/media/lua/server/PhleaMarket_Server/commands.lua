@@ -161,6 +161,7 @@ Commands[C.list] = function(playerObj, args)
     -- did not happen is the one outcome with no way to explain itself.
     if fee > 0 then
         Store.charge(playerObj, pool, fee)
+        Store.syncWallet(playerObj)
     end
 
     -- Remembered so the next one of these opens at this price rather than at
@@ -220,6 +221,11 @@ Commands[C.buy] = function(playerObj, args)
     if not Store.charge(playerObj, quote.pool, quote.gross) then
         return fail(playerObj, "InsufficientFunds")
     end
+    -- Told the moment it is taken, rather than at the end. Everything after
+    -- this can still refuse, and each of those paths would otherwise have to
+    -- remember to say so; sending here means the client is never left holding a
+    -- balance the server has already spent, whichever way the rest goes.
+    Store.syncWallet(playerObj)
 
     -- Then hand it over. If this fails the buyer is refunded: they have paid
     -- for something they did not get, and the listing has not been touched.
@@ -227,6 +233,9 @@ Commands[C.buy] = function(playerObj, args)
         -- The buyer is standing here, so an item refund goes straight back into
         -- their hands rather than queueing for a collection they did not earn.
         Store.creditCapped(playerObj, quote.pool, quote.gross)
+        -- Charged and refunded is usually a round trip to nothing, but not when
+        -- the refund meets the ceiling, so the client is told either way.
+        Store.syncWallet(playerObj)
         return fail(playerObj, "CouldNotDeliver")
     end
 
@@ -264,6 +273,11 @@ Commands[C.buy] = function(playerObj, args)
         if held > 0 then
             Listings.addCredit(store, sale.seller, sale.pool, held, Listings.REASON.WALLET_FULL, sale.listingId,
                 Store.now())
+        end
+        -- Only when they are here to be told. An offline seller's client reads
+        -- the server's record at their next login anyway.
+        if paid > 0 then
+            Store.syncWallet(seller)
         end
 
         -- Told now if they are here, left for them if they are not.
@@ -381,6 +395,12 @@ Commands[C.collect] = function(playerObj, args)
             Listings.addCredit(store, username, entry.pool, held, entry.reason, entry.listingId, Store.now())
         end
     end
+    -- Once, after the whole queue, rather than once per credit: a seller who
+    -- has been at the ceiling all week has a row for every sale, and the client
+    -- only ever wants the figure they add up to.
+    if creditedTotal > 0 then
+        Store.syncWallet(playerObj)
+    end
 
     Store.log({
         event = Listings.EVENT.COLLECT,
@@ -464,6 +484,7 @@ Commands[C.relist] = function(playerObj, args)
     table.remove(queue.items, index)
     if fee > 0 then
         Store.charge(playerObj, pool, fee)
+        Store.syncWallet(playerObj)
     end
 
     Store.log({
