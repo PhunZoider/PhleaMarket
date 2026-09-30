@@ -1,5 +1,5 @@
 version=1
-id=
+id=3810042520
 title=Phlea Market [DEV]
 description=[b]Development build. Not for general use.[/b]
 description=
@@ -12,4 +12,4 @@ description=
 description=Expect it to change without warning, and expect listings to be wiped between builds.
 description=
 tags=Build 42;Framework;Interface;Items;Multiplayer;Misc
-visibility=private
+visibility=unlisted
