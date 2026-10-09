@@ -30,7 +30,7 @@ echo [PhleaMarket] Deploying to %MODDIR%
 rem --- Live mods -------------------------------------------------------------
 for %%M in (%MODS%) do (
     rmdir /S /Q "%MODDIR%\%%M" 2>nul
-    xcopy "%SRC%Contents\mods\%%M" "%MODDIR%\%%M" /Y /I /E /F /Q >nul
+    xcopy "%SRC%Contents\mods\%%M" "%MODDIR%\%%M" /Y /I /E /F /Q /EXCLUDE:%SRC%xclude >nul
     if errorlevel 1 echo [PhleaMarket] FAILED copying %%M
 )
 

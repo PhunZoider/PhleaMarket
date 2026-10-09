@@ -218,7 +218,11 @@ function Store.creditCapped(target, pool, amount)
     if item then
         -- A username and not a player is a seller who is not here to be handed
         -- anything. Not a failure: the goods already wait in the same queue.
-        if type(target) ~= "table" or not target.getInventory then
+        --
+        -- Asked as "is it a name" rather than "is it a table": a player is a
+        -- Java object, which Kahlua reports as userdata, so the table check
+        -- turned away every player there is and every item payout was held.
+        if type(target) == "string" or not target.getInventory then
             return 0, amount
         end
         local whole = math.floor(amount / Market.ITEM_SCALE)

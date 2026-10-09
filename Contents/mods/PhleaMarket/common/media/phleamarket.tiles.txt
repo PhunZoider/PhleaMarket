@@ -1,0 +1,195 @@
+version = 1
+tileset
+{
+    file = phleamarket_01
+    size = 8,8
+    id = 1
+    // phleamarket_01_0
+    tile
+    {
+        xy = 0,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = E
+        GroupName = Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        LightRadius = 2
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 200
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        lightB = 225
+        lightG = 225
+        lightR = 225
+        lightswitch = 
+        solid = 
+    }
+    // phleamarket_01_1
+    tile
+    {
+        xy = 1,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = S
+        GroupName = Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        LightRadius = 2
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 200
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        lightB = 225
+        lightG = 225
+        lightR = 225
+        lightswitch = 
+        solid = 
+    }
+    // phleamarket_01_2
+    tile
+    {
+        xy = 2,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = W
+        GroupName = Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        LightRadius = 2
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 200
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        lightB = 225
+        lightG = 225
+        lightR = 225
+        lightswitch = 
+        solid = 
+    }
+    // phleamarket_01_3
+    tile
+    {
+        xy = 3,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = N
+        GroupName = Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        LightRadius = 2
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 200
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        lightB = 225
+        lightG = 225
+        lightR = 225
+        lightswitch = 
+        solid = 
+    }
+    // phleamarket_01_4
+    tile
+    {
+        xy = 4,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = E
+        GroupName = Unplugged Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 250
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        solidtrans = 
+    }
+    // phleamarket_01_5
+    tile
+    {
+        xy = 5,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = S
+        GroupName = Unplugged Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 250
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        solidtrans = 
+    }
+    // phleamarket_01_6
+    tile
+    {
+        xy = 6,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = W
+        GroupName = Unplugged Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 250
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        solidtrans = 
+    }
+    // phleamarket_01_7
+    tile
+    {
+        xy = 7,0
+        BlocksPlacement = 
+        CustomName = PhleaMarket
+        Facing = N
+        GroupName = Unplugged Phlea Market
+        HitByCar = 
+        IsMoveAble = 
+        ItemHeight = 70
+        Material = MetalPlates
+        Material2 = Electric
+        Material3 = Electric
+        PickUpWeight = 250
+        ScrapSize = Large
+        ScrapUseSkill = 
+        ScrapUseTool = 
+        StopCar = 
+        solidtrans = 
+    }
+}

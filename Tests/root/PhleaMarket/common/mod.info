@@ -8,3 +8,4 @@ icon=icon.png
 require=phunmart2dev
 versionMin=42.0.0
 pack=phleamarket
+tiledef=phleamarket 1425

@@ -14,4 +14,6 @@ ServerFiles
 .xcf
 .cursor
 .html
-converter
+converter
+phleamarket.tiles.txt
+phleamarket.tiles.txt.bak
